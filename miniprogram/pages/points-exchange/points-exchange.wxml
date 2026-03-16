@@ -1,0 +1,112 @@
+<view class="container">
+  <!-- 当前积分展示卡片 -->
+  <view class="points-card">
+    <view class="points-header">
+      <text class="points-title">我的积分</text>
+      <text class="points-hint">100积分 = 1元</text>
+    </view>
+    <view class="points-value-section">
+      <text class="points-number">{{userPoints}}</text>
+      <text class="points-unit">分</text>
+    </view>
+  </view>
+
+  <!-- 可兑换物品列表 -->
+  <view class="exchange-section">
+    <view class="section-header">
+      <text class="section-title">可兑换物品</text>
+    </view>
+    
+    <!-- 物品网格列表 -->
+    <view class="items-grid">
+      <block wx:for="{{exchangeItems}}" wx:key="id">
+        <view class="item-card" bindtap="showExchangeModal" data-item="{{item}}">
+          <image class="item-image" src="{{item.image_url || '/images/default-gift.png'}}" mode="aspectFill"></image>
+          <view class="item-info">
+            <text class="item-name">{{item.name}}</text>
+            <view class="item-price-section">
+              <view class="points-cost">
+                <text class="points-icon">💎</text>
+                <text class="points-text">{{item.points_required}}</text>
+              </view>
+              <view class="cash-price" wx:if="{{item.cash_price > 0}}">
+                <text class="cash-text">+ ¥{{item.cash_price}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{exchangeItems.length === 0 && !isLoading}}">
+      <image class="empty-icon" src="/images/empty.png" mode="aspectFit"></image>
+      <text class="empty-text">暂无兑换物品</text>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="loading-state" wx:if="{{isLoading}}">
+      <text>加载中...</text>
+    </view>
+  </view>
+
+  <!-- 兑换确认弹窗 -->
+  <view class="modal-mask" wx:if="{{showExchangeModal}}" bindtap="hideExchangeModal" catchtouchmove="preventBubble">
+    <view class="modal-content exchange-modal" catchtap="preventBubble" catchtouchmove="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">确认兑换</text>
+        <view class="modal-close" bindtap="hideExchangeModal">
+          <text class="close-icon">×</text>
+        </view>
+      </view>
+      
+      <view class="modal-body">
+        <!-- 物品信息 -->
+        <view class="exchange-item-info">
+          <image class="exchange-item-image" src="{{selectedItem.image_url || '/images/default-gift.png'}}" mode="aspectFill"></image>
+          <view class="exchange-item-detail">
+            <text class="exchange-item-name">{{selectedItem.name}}</text>
+            <text class="exchange-item-desc" wx:if="{{selectedItem.description}}">{{selectedItem.description}}</text>
+          </view>
+        </view>
+
+        <!-- 支付信息 -->
+        <view class="payment-info">
+          <view class="payment-row">
+            <text class="payment-label">积分抵扣</text>
+            <text class="payment-value points">-{{selectedItem.points_required}} 积分</text>
+          </view>
+          <view class="payment-row" wx:if="{{selectedItem.cash_price > 0}}">
+            <text class="payment-label">现金支付</text>
+            <text class="payment-value cash">¥{{selectedItem.cash_price}}</text>
+          </view>
+          <view class="payment-row" wx:if="{{selectedItem.cash_price === 0}}">
+            <text class="payment-label">现金支付</text>
+            <text class="payment-value free">¥0（纯积分兑换）</text>
+          </view>
+          <view class="payment-divider"></view>
+          <view class="payment-row total">
+            <text class="payment-label">兑换后剩余积分</text>
+            <text class="payment-value">{{userPoints - selectedItem.points_required}} 积分</text>
+          </view>
+        </view>
+
+        <!-- 积分不足提示 -->
+        <view class="insufficient-points" wx:if="{{userPoints < selectedItem.points_required}}">
+          <text class="insufficient-text">积分不足，还差 {{selectedItem.points_required - userPoints}} 积分</text>
+        </view>
+      </view>
+
+      <view class="modal-footer">
+        <button class="modal-btn" bindtap="hideExchangeModal">取消</button>
+        <button 
+          class="modal-btn primary" 
+          bindtap="confirmExchange"
+          disabled="{{userPoints < selectedItem.points_required || isExchanging}}"
+        >
+          {{isExchanging ? '兑换中...' : '确认兑换'}}
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

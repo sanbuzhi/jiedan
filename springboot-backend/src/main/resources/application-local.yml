@@ -1,0 +1,48 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: jiedan-backend
+  
+  datasource:
+    url: jdbc:mysql://192.168.1.8:3306/jiedan?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+
+jwt:
+  secret: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
+  expiration: ${JWT_EXPIRATION:2592000000}
+
+wechat:
+  appid: ${WECHAT_APPID:}
+  secret: ${WECHAT_SECRET:}
+
+logging:
+  level:
+    root: INFO
+    com.jiedan: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

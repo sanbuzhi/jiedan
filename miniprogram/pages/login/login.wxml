@@ -1,0 +1,50 @@
+<view class="login-container">
+  <view class="logo-section">
+    <image class="logo" src="/images/logo.png" mode="aspectFit"></image>
+    <text class="app-name">接单助手</text>
+    <text class="app-slogan">智能获客，轻松接单</text>
+  </view>
+
+  <view class="login-card">
+    <view class="login-title">欢迎登录</view>
+    <view class="login-desc">授权微信登录，开启智能获客之旅</view>
+    
+    <view class="feature-list">
+      <view class="feature-item">
+        <text class="feature-icon">✓</text>
+        <text class="feature-text">AI智能生成营销物料</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">✓</text>
+        <text class="feature-text">一键发布多平台获客</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">✓</text>
+        <text class="feature-text">推荐好友赚取积分</text>
+      </view>
+    </view>
+
+    <button 
+      class="login-btn {{canLogin ? '' : 'disabled'}}" 
+      bindtap="onGetUserProfile"
+      disabled="{{!canLogin || isLoading}}"
+    >
+      <text wx:if="{{!isLoading}}">微信一键登录</text>
+      <text wx:else>登录中...</text>
+    </button>
+
+    <view class="privacy-tips">
+      <text>登录即表示您同意</text>
+      <text class="link" bindtap="showUserAgreement">《用户协议》</text>
+      <text>和</text>
+      <text class="link" bindtap="showPrivacyPolicy">《隐私政策》</text>
+    </view>
+  </view>
+
+  <view class="referral-section" wx:if="{{referrerCode}}">
+    <view class="referral-info">
+      <text class="referral-label">您通过好友推荐进入</text>
+      <text class="referral-code">推荐码：{{referrerCode}}</text>
+    </view>
+  </view>
+</view>

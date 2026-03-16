@@ -1,0 +1,316 @@
+<view class="container">
+  <!-- 用户信息卡片 -->
+  <view class="user-card">
+    <view class="user-info">
+      <view class="avatar-container" bindtap="onAvatarTap">
+        <image class="avatar-large" src="{{cachedAvatarPath}}" mode="aspectFill" wx:if="{{cachedAvatarPath}}"></image>
+        <image class="avatar-large" src="{{userInfo.avatar}}" mode="aspectFill" wx:else></image>
+        <view class="avatar-overlay" wx:if="{{userInfo.isDefaultAvatar}}">
+          <text class="camera-icon">📷</text>
+        </view>
+      </view>
+      <view class="user-meta">
+        <text class="nickname">{{userInfo.nickname || '未设置昵称'}}</text>
+        <text class="user-id">ID: {{userInfo.id || '--'}}</text>
+        <text class="avatar-tip" wx:if="{{userInfo.isDefaultAvatar}}">点击修改专属头像</text>
+      </view>
+    </view>
+    <view class="points-section">
+      <view class="points-item">
+        <text class="points-value">{{userInfo.total_points || 0}}</text>
+        <text class="points-label">我的积分</text>
+      </view>
+      <view class="points-divider"></view>
+      <view class="points-item">
+        <text class="points-value">{{referralCount}}</text>
+        <text class="points-label">推荐人数</text>
+      </view>
+    </view>
+    <view class="points-exchange-section">
+      <view class="exchange-btn" bindtap="navigateToExchange">
+        <text class="exchange-icon">🎁</text>
+        <text class="exchange-text">积分兑换</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 推荐码卡片 -->
+  <view class="card referral-card">
+    <view class="card-header">
+      <text class="card-title">我的推荐码</text>
+      <text class="share-btn" bindtap="onShare">分享赚积分</text>
+    </view>
+    <view class="referral-code-section">
+      <view class="code-display">
+        <text class="code-text">{{userInfo.referralCode || '--'}}</text>
+      </view>
+      <view class="code-actions">
+        <button class="action-btn" bindtap="copyReferralCode">复制</button>
+        <button class="action-btn primary" open-type="share">分享</button>
+      </view>
+    </view>
+    <view class="referral-tips">
+      <text>好友通过您的推荐码注册，您可获得100积分奖励</text>
+    </view>
+  </view>
+
+  <!-- 推荐关系树 -->
+  <view class="card tree-card">
+    <view class="card-header">
+      <text class="card-title">我的推荐团队</text>
+      <text class="view-all" bindtap="toggleCanvasView">{{showCanvasView ? '列表视图' : '树状视图'}}</text>
+    </view>
+    
+    <view class="tree-summary">
+      <view class="summary-item">
+        <text class="summary-value level-1">{{treeStats.level1}}</text>
+        <text class="summary-label">一级推荐</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-value level-2">{{treeStats.level2}}</text>
+        <text class="summary-label">二级推荐</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-value level-3">{{treeStats.level3}}</text>
+        <text class="summary-label">三级推荐</text>
+      </view>
+    </view>
+
+    <!-- Canvas 树状图 -->
+    <view class="canvas-container" wx:if="{{showCanvasView && referralTree.children && referralTree.children.length > 0}}" catchtouchmove="onCanvasTouchMove">
+      <scroll-view 
+        class="canvas-scroll-view" 
+        scroll-x="true" 
+        scroll-y="false"
+        enhanced="true"
+        show-scrollbar="true"
+      >
+        <canvas 
+          type="2d" 
+          id="referralTreeCanvas" 
+          class="referral-tree-canvas"
+          style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+          catchtouchstart="onCanvasTouchStart"
+          catchtouchmove="onCanvasTouchMove"
+          catchtouchend="onCanvasTouchEnd"
+        ></canvas>
+      </scroll-view>
+      <!-- 图例 -->
+      <view class="canvas-legend">
+        <view class="legend-item">
+          <view class="legend-dot level-1"></view>
+          <text class="legend-text">一级</text>
+        </view>
+        <view class="legend-item">
+          <view class="legend-dot level-2"></view>
+          <text class="legend-text">二级</text>
+        </view>
+        <view class="legend-item">
+          <view class="legend-dot level-3"></view>
+          <text class="legend-text">三级</text>
+        </view>
+      </view>
+      <!-- 操作提示 -->
+      <view class="canvas-hint">
+        <text class="hint-text">双指缩放，单指拖拽</text>
+      </view>
+    </view>
+
+    <!-- 原有列表视图 -->
+    <view class="tree-list" wx:if="{{!showCanvasView && referralTree.children && referralTree.children.length > 0}}">
+      <block wx:for="{{referralTree.children}}" wx:key="id">
+        <view class="tree-item level-1-item">
+          <view class="tree-user" bindtap="toggleExpand" data-index="{{index}}">
+            <image class="tree-avatar" src="{{item.user.avatar}}" mode="aspectFill" wx:if="{{item.user.avatar}}"></image>
+            <view class="tree-avatar-placeholder" wx:else>
+              <text class="avatar-initial">{{item.user.nickname ? item.user.nickname.charAt(0).toUpperCase() : '?'}}</text>
+            </view>
+            <view class="tree-info">
+              <text class="tree-name">{{item.user.nickname || '匿名用户'}}</text>
+              <text class="tree-date">{{formatDate(item.user.created_at)}}</text>
+            </view>
+            <view class="tree-expand">
+              <text class="expand-icon {{item.expanded ? 'expanded' : ''}}" wx:if="{{item.children && item.children.length > 0}}">▼</text>
+            </view>
+          </view>
+          
+          <!-- 二级推荐 -->
+          <view class="sub-tree" wx:if="{{item.expanded && item.children && item.children.length > 0}}">
+            <block wx:for="{{item.children}}" wx:for-item="child" wx:for-index="childIndex" wx:key="id">
+              <view class="tree-item level-2-item">
+                <view class="tree-user" bindtap="toggleChildExpand" data-parent-index="{{index}}" data-child-index="{{childIndex}}">
+                  <image class="tree-avatar small" src="{{child.user.avatar}}" mode="aspectFill" wx:if="{{child.user.avatar}}"></image>
+                  <view class="tree-avatar-placeholder small" wx:else>
+                    <text class="avatar-initial small">{{child.user.nickname ? child.user.nickname.charAt(0).toUpperCase() : '?'}}</text>
+                  </view>
+                  <view class="tree-info">
+                    <text class="tree-name">{{child.user.nickname || '匿名用户'}}</text>
+                    <text class="tree-date">{{formatDate(child.user.created_at)}}</text>
+                  </view>
+                  <view class="tree-expand">
+                    <text class="expand-icon {{child.expanded ? 'expanded' : ''}}" wx:if="{{child.children && child.children.length > 0}}">▼</text>
+                  </view>
+                </view>
+
+                <!-- 三级推荐 -->
+                <view class="sub-tree" wx:if="{{child.expanded && child.children && child.children.length > 0}}">
+                  <block wx:for="{{child.children}}" wx:for-item="grandchild" wx:for-index="grandchildIndex" wx:key="id">
+                    <view class="tree-item level-3-item">
+                      <view class="tree-user">
+                        <image class="tree-avatar small" src="{{grandchild.user.avatar}}" mode="aspectFill" wx:if="{{grandchild.user.avatar}}"></image>
+                        <view class="tree-avatar-placeholder small" wx:else>
+                          <text class="avatar-initial small">{{grandchild.user.nickname ? grandchild.user.nickname.charAt(0).toUpperCase() : '?'}}</text>
+                        </view>
+                        <view class="tree-info">
+                          <text class="tree-name">{{grandchild.user.nickname || '匿名用户'}}</text>
+                          <text class="tree-date">{{formatDate(grandchild.user.created_at)}}</text>
+                        </view>
+                      </view>
+                    </view>
+                  </block>
+                </view>
+              </view>
+            </block>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{!referralTree.children || referralTree.children.length === 0}}">
+      <text>暂无推荐记录，快去分享您的推荐码吧！</text>
+    </view>
+  </view>
+
+  <!-- 积分记录 -->
+  <view class="card points-card">
+    <view class="card-header">
+      <text class="card-title">积分记录</text>
+      <text class="view-all" bindtap="viewAllPoints">查看全部</text>
+    </view>
+    <view class="points-list">
+      <block wx:for="{{pointRecords}}" wx:key="id">
+        <view class="points-item-record">
+          <view class="points-info">
+            <text class="points-desc">{{item.description}}</text>
+            <text class="points-time">{{formatDate(item.created_at)}}</text>
+          </view>
+          <text class="points-amount {{item.amount > 0 ? 'positive' : 'negative'}}">
+            {{item.amount > 0 ? '+' : ''}}{{item.amount}}
+          </text>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:if="{{pointRecords.length === 0}}">
+      <text>暂无积分记录</text>
+    </view>
+  </view>
+
+  <!-- 退出登录 -->
+  <button class="logout-btn" bindtap="logout">退出登录</button>
+
+  <!-- 分享规则弹窗 -->
+  <view class="modal-mask" wx:if="{{showShareRulesModal}}" bindtap="hideShareRules">
+    <view class="modal-content share-rules-modal" catchtap="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">分享赚积分规则</text>
+        <view class="modal-close" bindtap="hideShareRules">
+          <text class="close-icon">×</text>
+        </view>
+      </view>
+      <view class="modal-body">
+        <view class="rules-section">
+          <view class="rules-title">推荐奖励</view>
+          <view class="rules-item">
+            <text class="rules-dot level-1"></text>
+            <text class="rules-text">一级推荐奖励 100 积分</text>
+          </view>
+          <view class="rules-item">
+            <text class="rules-dot level-2"></text>
+            <text class="rules-text">二级推荐奖励 50 积分</text>
+          </view>
+          <view class="rules-item">
+            <text class="rules-dot level-3"></text>
+            <text class="rules-text">三级推荐奖励 30 积分</text>
+          </view>
+        </view>
+        <view class="rules-section">
+          <view class="rules-title">积分使用说明</view>
+          <view class="rules-desc">
+            <text>积分可兑换平台奖励、抵扣开发费用</text>
+            <text class="rules-highlight">100 积分 = 1 元</text>
+          </view>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="modal-btn" bindtap="copyShareLink">分享链接</button>
+        <button class="modal-btn primary" bindtap="generateQRCode">生成二维码</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二维码预览弹窗 -->
+  <view class="modal-mask" wx:if="{{showQRCodeModal}}" bindtap="hideQRCode">
+    <view class="modal-content qrcode-modal" catchtap="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">推荐二维码</text>
+        <view class="modal-close" bindtap="hideQRCode">
+          <text class="close-icon">×</text>
+        </view>
+      </view>
+      <view class="modal-body qrcode-body">
+        <image class="qrcode-image" src="{{qrCodeUrl}}" mode="aspectFit" wx:if="{{qrCodeUrl}}"></image>
+        <view class="qrcode-loading" wx:if="{{!qrCodeUrl}}">
+          <text>生成中...</text>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="modal-btn primary full-width" bindtap="saveQRCode">保存到相册</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 编辑个人资料弹窗 -->
+  <view class="modal-mask" wx:if="{{showEditModal}}" bindtap="hideEditModal">
+    <view class="modal-content edit-profile-modal" catchtap="preventBubble">
+      <view class="modal-header edit-header">
+        <text class="modal-title">编辑个人资料</text>
+        <view class="modal-close" bindtap="hideEditModal">
+          <text class="close-icon">×</text>
+        </view>
+      </view>
+      <view class="modal-body edit-body">
+        <!-- 头像编辑区 -->
+        <view class="edit-avatar-section">
+          <view class="edit-avatar-container" bindtap="chooseAvatar">
+            <image class="edit-avatar" src="{{editAvatar || cachedAvatarPath || userInfo.avatar}}" mode="aspectFill"></image>
+            <view class="edit-avatar-overlay">
+              <text class="edit-avatar-text">点击更换</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 昵称编辑区 -->
+        <view class="edit-form-item">
+          <text class="edit-label">昵称</text>
+          <input
+            class="edit-input"
+            type="text"
+            placeholder="请输入昵称"
+            value="{{editNickname}}"
+            bindinput="onNicknameInput"
+            maxlength="20"
+          />
+          <text class="edit-hint">2-20个字符，支持中文、英文、数字</text>
+        </view>
+      </view>
+      <view class="modal-footer edit-footer">
+        <button class="modal-btn" bindtap="hideEditModal">取消</button>
+        <button class="modal-btn primary" bindtap="saveProfile" disabled="{{isSaving}}">
+          <text wx:if="{{!isSaving}}">保存</text>
+          <text wx:if="{{isSaving}}">保存中...</text>
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

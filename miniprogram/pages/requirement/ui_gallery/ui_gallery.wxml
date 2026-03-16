@@ -1,0 +1,74 @@
+<view class="container">
+  <!-- 顶部导航栏 -->
+  <view class="header">
+    <view class="back-btn" bindtap="onNavigateBack">
+      <text class="back-icon">‹</text>
+    </view>
+    <text class="header-title">交互视觉资源库</text>
+    <view class="header-placeholder"></view>
+  </view>
+
+  <!-- 筛选标签栏 -->
+  <view class="filter-section">
+    <scroll-view class="filter-scroll" scroll-x="true" show-scrollbar="false">
+      <view class="filter-list">
+        <view
+          wx:for="{{categories}}"
+          wx:key="id"
+          class="filter-tag {{selectedCategory === item.id ? 'active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onSelectCategory"
+        >
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 内容区域 -->
+  <scroll-view class="content-scroll" scroll-y="true" enhanced="true" show-scrollbar="false">
+    <!-- UI设计范式网格（3列） -->
+    <view class="style-grid">
+      <view
+        wx:for="{{styles}}"
+        wx:key="id"
+        wx:if="{{selectedCategory === 'all' || item.category === selectedCategory}}"
+        class="style-card {{selectedStyle === item.id ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        data-name="{{item.name}}"
+        bindtap="onSelectStyle"
+      >
+        <!-- 预览图 -->
+        <view class="card-preview" style="background-color: {{item.color}};">
+          <view class="preview-elements" style="color: {{item.textColor}};">
+            <view class="preview-shape"></view>
+            <view class="preview-lines">
+              <view class="preview-line"></view>
+              <view class="preview-line short"></view>
+            </view>
+          </view>
+        </view>
+        <!-- 风格名称 -->
+        <view class="card-info">
+          <text class="card-name">{{item.name}}</text>
+        </view>
+        <!-- 选中标记 -->
+        <view wx:if="{{selectedStyle === item.id}}" class="card-check">✓</view>
+      </view>
+    </view>
+
+    <!-- 底部留白 -->
+    <view class="bottom-space"></view>
+  </scroll-view>
+
+  <!-- 底部确认按钮 -->
+  <view class="footer">
+    <button
+      class="confirm-btn {{selectedStyle ? 'active' : ''}}"
+      bindtap="onConfirmStyle"
+      disabled="{{!selectedStyle}}"
+    >
+      <text>采用此方案</text>
+    </button>
+  </view>
+</view>

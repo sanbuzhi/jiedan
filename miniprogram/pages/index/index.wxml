@@ -1,0 +1,96 @@
+<view class="container">
+  <!-- 我的项目区域 -->
+  <view class="section projects-section">
+    <view class="section-header">
+      <text class="section-title">我的项目</text>
+      <text class="section-more" bindtap="viewAllProjects" wx:if="{{allRequirements.length > 0}}">查看全部 ></text>
+    </view>
+
+    <!-- 无项目状态 -->
+    <view class="empty-project-card" wx:if="{{allRequirements.length === 0}}" bindtap="createNewProject">
+      <view class="empty-icon">+</view>
+      <text class="empty-title">添加第一个项目</text>
+      <text class="empty-desc">点击开始您的AI开发之旅</text>
+    </view>
+
+    <!-- 有项目状态 - 多个项目卡片 -->
+    <view class="projects-list" wx:if="{{allRequirements.length > 0}}" style="opacity: {{showProjects ? 1 : 0}}; transition: opacity 0.1s;">
+      <view class="project-flow-card-container">
+        <view class="project-flow-card" wx:for="{{allRequirements}}" wx:key="id" wx:for-item="req">
+          <view class="project-header">
+            <text class="project-id">项目 #{{req.id}} - {{req.projectType}}</text>
+            <view class="project-header-right">
+              <view class="project-status {{req.status}}">
+                {{statusText[req.status]}}
+              </view>
+              <!-- 删除按钮：节点1为active状态且status为draft时显示 -->
+              <view wx:if="{{req.flowNodes[0] && req.flowNodes[0].status === 'active' && req.status === 'draft'}}" class="delete-btn" bindtap="deleteProject" data-id="{{req.id}}">删除</view>
+            </view>
+          </view>
+
+          <!-- 流程节点时间线 - 水平滚动 -->
+          <scroll-view id="flow-scroll-{{index}}" class="flow-timeline-scroll" scroll-x="true" enhanced="true" show-scrollbar="false" scroll-into-view="{{req.scrollIntoViewId}}" scroll-with-animation="false">
+            <view class="flow-timeline-horizontal">
+              <view class="flow-node-wrapper" wx:for="{{req.flowNodes}}" wx:for-item="node" wx:for-index="nodeIndex" wx:key="nodeIndex">
+                <view class="flow-node {{node.status}}" id="node-{{index}}-{{nodeIndex}}" bindtap="onFlowNodeTap" data-req-index="{{index}}" data-node-index="{{nodeIndex}}" data-req-id="{{req.id}}">
+                  <view class="flow-node-icon">
+                    <!-- AI节点且active状态显示动态图标 -->
+                    <view wx:if="{{node.isAiNode && node.status === 'active'}}" class="ai-working-icon">
+                      <view class="ai-robot">
+                        <view class="ai-head">🤖</view>
+                        <view class="ai-dots">
+                          <view class="dot"></view>
+                          <view class="dot"></view>
+                          <view class="dot"></view>
+                        </view>
+                      </view>
+                    </view>
+                    <!-- completed状态显示✓ -->
+                    <text wx:elif="{{node.status === 'completed'}}">✓</text>
+                    <!-- 其他显示数字 -->
+                    <text wx:else>{{nodeIndex + 1}}</text>
+                  </view>
+                  <view class="flow-node-label">{{node.title}}</view>
+                  <!-- 点击提示 -->
+                  <view wx:if="{{node.clickHint}}" class="flow-node-hint">{{node.clickHint}}</view>
+                </view>
+                <view class="flow-arrow" wx:if="{{nodeIndex < req.flowNodes.length - 1}}">▶</view>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+        <!-- 添加项目按钮 -->
+        <view class="add-project-btn" bindtap="createNewProject">
+          <text class="add-project-icon">+</text> 
+          <text class="add-project-text">添加项目</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 实时成交区域 -->
+  <view class="section deals-section">
+    <view class="section-header">
+      <text class="section-title">实时成交</text>
+      <view class="live-indicator">
+        <view class="live-dot"></view>
+        <text class="live-text">LIVE</text>
+      </view>
+    </view>
+    <view class="deals-container tech-card">
+      <scroll-view class="deals-scroll" scroll-y="true" enhanced="true" show-scrollbar="false">
+        <view class="deal-item" wx:for="{{recentDeals}}" wx:key="index">
+          <view class="deal-avatar tech-avatar">{{item.avatar}}</view>
+          <view class="deal-info">
+            <text class="deal-user">{{item.user}}</text>
+            <text class="deal-type">{{item.projectType}}</text>
+          </view>
+          <view class="deal-amount">
+            <text class="deal-price">¥{{item.amount}}</text>
+            <text class="deal-time">{{item.time}}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

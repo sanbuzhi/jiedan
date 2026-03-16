@@ -1,0 +1,363 @@
+.container {
+  padding: 20rpx 30rpx 60rpx;
+}
+
+/* 积分卡片 */
+.points-card {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  border-radius: 24rpx;
+  padding: 40rpx;
+  margin-bottom: 24rpx;
+  color: #ffffff;
+}
+
+.points-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.points-title {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.points-hint {
+  font-size: 24rpx;
+  opacity: 0.8;
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.points-value-section {
+  display: flex;
+  align-items: baseline;
+}
+
+.points-number {
+  font-size: 72rpx;
+  font-weight: bold;
+  margin-right: 12rpx;
+}
+
+.points-unit {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+/* 兑换区域 */
+.exchange-section {
+  background-color: #ffffff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.section-header {
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+/* 物品网格列表（2列布局） */
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+}
+
+/* 物品卡片 */
+.item-card {
+  background-color: #ffffff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s;
+}
+
+.item-card:active {
+  transform: scale(0.98);
+}
+
+.item-image {
+  width: 100%;
+  height: 240rpx;
+  background-color: #f5f5f5;
+}
+
+.item-info {
+  padding: 20rpx;
+}
+
+.item-name {
+  display: block;
+  font-size: 28rpx;
+  color: #333333;
+  font-weight: 500;
+  margin-bottom: 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-price-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.points-cost {
+  display: flex;
+  align-items: center;
+}
+
+.points-icon {
+  font-size: 24rpx;
+  margin-right: 6rpx;
+}
+
+.points-text {
+  font-size: 28rpx;
+  color: #fa8c16;
+  font-weight: bold;
+}
+
+.cash-price {
+  display: flex;
+  align-items: center;
+}
+
+.cash-text {
+  font-size: 24rpx;
+  color: #fa5151;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 40rpx;
+}
+
+.empty-icon {
+  width: 200rpx;
+  height: 200rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+/* 加载状态 */
+.loading-state {
+  text-align: center;
+  padding: 60rpx 40rpx;
+  color: #999999;
+  font-size: 28rpx;
+}
+
+/* 弹窗遮罩层 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  /* 阻止底层页面滚动 */
+  overscroll-behavior: contain;
+}
+
+/* 弹窗内容 */
+.modal-content {
+  background-color: #ffffff;
+  border-radius: 24rpx;
+  width: 85%;
+  max-width: 640rpx;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+.modal-close {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-icon {
+  font-size: 40rpx;
+  color: #999999;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 30rpx;
+  max-height: 800rpx;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  padding: 20rpx 30rpx 30rpx;
+  gap: 20rpx;
+}
+
+.modal-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  color: #666666;
+  background-color: #f5f5f5;
+  border-radius: 12rpx;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-btn::after {
+  border: none;
+}
+
+.modal-btn.primary {
+  color: #ffffff;
+  background-color: #07c160;
+}
+
+.modal-btn.primary[disabled] {
+  background-color: #cccccc;
+  color: #ffffff;
+}
+
+/* 兑换弹窗样式 */
+.exchange-modal {
+  width: 90%;
+}
+
+.exchange-item-info {
+  display: flex;
+  align-items: center;
+  padding: 20rpx;
+  background-color: #f9f9f9;
+  border-radius: 16rpx;
+  margin-bottom: 30rpx;
+}
+
+.exchange-item-image {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 12rpx;
+  margin-right: 24rpx;
+  background-color: #f0f0f0;
+}
+
+.exchange-item-detail {
+  flex: 1;
+}
+
+.exchange-item-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 12rpx;
+}
+
+.exchange-item-desc {
+  display: block;
+  font-size: 26rpx;
+  color: #666666;
+  line-height: 1.5;
+}
+
+/* 支付信息 */
+.payment-info {
+  background-color: #fafafa;
+  border-radius: 16rpx;
+  padding: 24rpx;
+}
+
+.payment-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+}
+
+.payment-row.total {
+  padding-top: 20rpx;
+  margin-top: 8rpx;
+}
+
+.payment-label {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+.payment-value {
+  font-size: 28rpx;
+  color: #333333;
+  font-weight: 500;
+}
+
+.payment-value.points {
+  color: #fa8c16;
+}
+
+.payment-value.cash {
+  color: #fa5151;
+  font-weight: bold;
+}
+
+.payment-value.free {
+  color: #07c160;
+}
+
+.payment-divider {
+  height: 1rpx;
+  background-color: #e0e0e0;
+  margin: 8rpx 0;
+}
+
+/* 积分不足提示 */
+.insufficient-points {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background-color: #fff2f0;
+  border: 1rpx solid #ffccc7;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.insufficient-text {
+  font-size: 26rpx;
+  color: #fa5151;
+}

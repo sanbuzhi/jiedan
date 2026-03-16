@@ -1,0 +1,267 @@
+<view class="container">
+  <!-- 顶部固定 -->
+  <view class="header-fixed">
+    <!-- 进度指示器 -->
+    <view class="progress-bar">
+      <view class="progress-step {{currentStep >= 1 ? 'completed' : ''}} {{currentStep === 1 ? 'active' : ''}}">
+        <view class="step-number">1</view>
+        <text class="step-text">身份</text>
+      </view>
+      <view class="progress-line {{currentStep >= 2 ? 'completed' : ''}}"></view>
+      <view class="progress-step {{currentStep >= 2 ? 'completed' : ''}} {{currentStep === 2 ? 'active' : ''}}">
+        <view class="step-number">2</view>
+        <text class="step-text">类型</text>
+      </view>
+      <view class="progress-line {{currentStep >= 3 ? 'completed' : ''}}"></view>
+      <view class="progress-step {{currentStep >= 3 ? 'completed' : ''}} {{currentStep === 3 ? 'active' : ''}}">
+        <view class="step-number">3</view>
+        <text class="step-text">上线</text>
+      </view>
+      <view class="progress-line {{currentStep >= 4 ? 'completed' : ''}}"></view>
+      <view class="progress-step {{currentStep >= 4 ? 'completed' : ''}} {{currentStep === 4 ? 'active' : ''}}">
+        <view class="step-number">4</view>
+        <text class="step-text">流量</text>
+      </view>
+      <view class="progress-line {{currentStep >= 5 ? 'completed' : ''}}"></view>
+      <view class="progress-step {{currentStep >= 5 ? 'completed' : ''}} {{currentStep === 5 ? 'active' : ''}}">
+        <view class="step-number">5</view>
+        <text class="step-text">周期</text>
+      </view>
+    </view>
+
+    <!-- 页面标题 -->
+    <view class="page-header">
+      <text class="page-title">{{stepConfig.title}}</text>
+      <text class="page-subtitle">{{stepConfig.subtitle}}</text>
+    </view>
+  </view>
+
+  <!-- 中部可滚动 -->
+  <scroll-view class="content-scroll" scroll-y="true" scroll-top="{{scrollTop}}">
+    <!-- Step 1 & 2: 选项列表 -->
+    <block wx:if="{{currentStep === 1 || currentStep === 2}}">
+      <view class="options-card">
+        <view 
+          wx:for="{{stepConfig.options}}"
+          wx:key="value"
+          class="option-item {{selectedValue === item.value ? 'selected' : ''}}"
+          data-value="{{item.value}}"
+          bindtap="onSelect"
+        >
+          <view class="option-icon {{item.value}}">{{item.icon}}</view>
+          <view class="option-content">
+            <text class="option-title">{{item.title}}</text>
+            <text class="option-desc">{{item.desc}}</text>
+          </view>
+          <view class="option-check">
+            <view class="check-circle {{selectedValue === item.value ? 'checked' : ''}}"></view>
+          </view>
+        </view>
+
+        <!-- 其他选项的输入框 -->
+        <view class="other-input-wrapper {{selectedValue === 'other' ? 'show' : ''}}" wx:if="{{stepConfig.hasOther}}">
+          <input 
+            class="other-input"
+            type="text"
+            placeholder="{{stepConfig.otherPlaceholder}}"
+            value="{{otherValue}}"
+            bindinput="onOtherInput"
+            maxlength="50"
+          />
+        </view>
+      </view>
+    </block>
+
+    <!-- Step 3: 上线需求 -->
+    <block wx:if="{{currentStep === 3}}">
+      <view class="card">
+        <view class="form-item">
+          <view class="form-label">
+            <text class="label-text">是否需要上线部署</text>
+          </view>
+          <switch checked="{{needDeploy}}" bindchange="onDeployChange" color="#07c160" />
+        </view>
+
+        <view class="info-box {{needDeploy ? 'active' : ''}}">
+          <view class="info-icon">ℹ️</view>
+          <view class="info-content">
+            <text class="info-title">上线服务说明</text>
+            <text class="info-text">选择"是"将包含以下基础设施费用：</text>
+            <view class="info-list">
+              <view class="info-item" wx:for="{{stepConfig.serviceItems}}" wx:key="*this">
+                <text class="item-dot">•</text>
+                <text class="item-text">{{item}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="tip-box" wx:if="{{!needDeploy}}">
+          <view class="tip-icon">💡</view>
+          <text class="tip-text">选择"否"则仅提供源代码，需自行部署上线</text>
+        </view>
+      </view>
+
+      <!-- 费用预估提示 -->
+      <view class="card fee-card" wx:if="{{needDeploy}}">
+        <view class="fee-header">
+          <text class="fee-title">基础设施费用参考</text>
+        </view>
+        <view class="fee-list">
+          <view class="fee-item" wx:for="{{stepConfig.feeItems}}" wx:key="name">
+            <text class="fee-name">{{item.name}}</text>
+            <text class="fee-price">{{item.price}}</text>
+          </view>
+        </view>
+        <text class="fee-note">* 具体费用根据实际流量和配置需求确定</text>
+      </view>
+    </block>
+
+    <!-- Step 4: 流量预估 -->
+    <block wx:if="{{currentStep === 4}}">
+      <view class="card">
+        <view class="form-item" wx:for="{{stepConfig.inputs}}" wx:key="key">
+          <view class="form-label">
+            <text class="label-text">{{item.label}}</text>
+            <text class="label-unit">（{{item.unit}}）</text>
+          </view>
+          <input 
+            class="form-input {{errors[item.key] ? 'error' : ''}}"
+            type="number"
+            placeholder="{{item.placeholder}}"
+            value="{{formData[item.key]}}"
+            data-key="{{item.key}}"
+            bindinput="onInputChange"
+            bindblur="onInputBlur"
+          />
+          <text class="error-text" wx:if="{{errors[item.key]}}">{{errors[item.key]}}</text>
+        </view>
+      </view>
+
+      <!-- 流量说明 -->
+      <view class="card info-card">
+        <view class="info-header">
+          <view class="info-icon">📊</view>
+          <text class="info-title">流量指标说明</text>
+        </view>
+        <view class="info-list">
+          <view class="info-item" wx:for="{{stepConfig.infoItems}}" wx:key="key">
+            <view class="item-marker {{item.key}}"></view>
+            <view class="item-content">
+              <text class="item-title">{{item.title}}</text>
+              <text class="item-desc">{{item.desc}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 配置建议 -->
+      <view class="card suggest-card" wx:if="{{showSuggestion}}">
+        <view class="suggest-header">
+          <text class="suggest-title">服务器配置建议</text>
+        </view>
+        <view class="suggest-content">
+          <view class="suggest-level {{suggestion.level}}">
+            <text class="level-name">{{suggestion.name}}</text>
+            <text class="level-desc">{{suggestion.desc}}</text>
+          </view>
+          <view class="suggest-specs">
+            <view class="spec-item" wx:for="{{suggestion.specs}}" wx:key="index">
+              <text class="spec-label">{{item.label}}</text>
+              <text class="spec-value">{{item.value}}</text>
+            </view>
+          </view>
+          <text class="suggest-price">预估费用：{{suggestion.price}}</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- Step 5: 交付周期 -->
+    <block wx:if="{{currentStep === 5}}">
+      <view class="card">
+        <view class="section-title">紧急程度</view>
+        <view class="urgency-list">
+          <view 
+            wx:for="{{stepConfig.urgencyOptions}}"
+            wx:key="value"
+            class="urgency-item {{urgency === item.value ? 'active' : ''}}"
+            data-value="{{item.value}}"
+            bindtap="onUrgencyChange"
+          >
+            <view class="urgency-icon">{{item.icon}}</view>
+            <view class="urgency-info">
+              <text class="urgency-name">{{item.name}}</text>
+              <text class="urgency-time">{{item.time}}</text>
+            </view>
+            <view class="urgency-check" wx:if="{{urgency === item.value}}">✓</view>
+            <view class="urgency-tag {{item.tagClass}}" wx:if="{{item.tag}}">{{item.tag}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 具体天数选择 -->
+      <view class="card">
+        <view class="section-title">具体交付天数</view>
+        <picker mode="selector" range="{{dayOptions}}" value="{{dayIndex}}" bindchange="onDayChange">
+          <view class="picker-item">
+            <text class="picker-label">选择天数</text>
+            <view class="picker-value">
+              <text class="value-text">{{selectedDays}} 天</text>
+              <text class="picker-arrow">></text>
+            </view>
+          </view>
+        </picker>
+        <text class="day-hint">{{dayHint}}</text>
+      </view>
+
+      <!-- 加急费用提示 -->
+      <view class="card fee-card" wx:if="{{urgencyFee > 0}}">
+        <view class="fee-header">
+          <view class="fee-icon">⚡</view>
+          <text class="fee-title">加急费用</text>
+        </view>
+        <view class="fee-content">
+          <text class="fee-label">当前选择包含加急费用</text>
+          <text class="fee-amount">¥{{urgencyFee}}</text>
+        </view>
+        <view class="fee-detail">
+          <text class="detail-text">基础费用 × {{urgencyMultiplier}} = 加急后费用</text>
+        </view>
+      </view>
+
+      <!-- 交付说明 -->
+      <view class="card info-card">
+        <view class="info-header">
+          <view class="info-icon">📋</view>
+          <text class="info-title">交付说明</text>
+        </view>
+        <view class="info-list">
+          <view class="info-item" wx:for="{{stepConfig.deliveryNotes}}" wx:key="*this">
+            <text class="item-dot">•</text>
+            <text class="item-text">{{item}}</text>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 底部留白 -->
+    <view class="bottom-space"></view>
+  </scroll-view>
+
+  <!-- 底部固定 -->
+  <view class="footer-fixed">
+    <!-- 提示信息 -->
+    <view class="tips-card">
+      <text class="tips-icon">💡</text>
+      <text class="tips-text">{{stepConfig.tip}}</text>
+    </view>
+
+    <!-- 底部按钮 -->
+    <view class="footer-actions">
+      <button class="prev-btn" bindtap="goBack" wx:if="{{currentStep > 1}}">上一步</button>
+      <button class="next-btn active" bindtap="goNext">
+        {{currentStep === 5 ? '完成' : '下一步'}}
+      </button>
+    </view>
+  </view>
+</view>

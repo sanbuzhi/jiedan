@@ -1,0 +1,50 @@
+{
+  "pages": [
+    "pages/guide/guide",
+    "pages/index/index",
+    "pages/login/login",
+    "pages/profile/profile",
+    "pages/points-list/points-list",
+    "pages/points-exchange/points-exchange",
+    "pages/requirement/step/step",
+    "pages/requirement/step_all/step_all",
+    "pages/requirement/ui_gallery/ui_gallery",
+    "pages/requirement/approve/approve",
+    "pages/requirement/suggestion/suggestion"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#07c160",
+    "navigationBarTitleText": "接单助手",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#07c160",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "downloadFile": 10000
+  },
+  "debug": false,
+  "permission": {
+    "scope.userInfo": {
+      "desc": "用于完善用户资料"
+    }
+  },
+  "requiredBackgroundModes": [],
+  "lazyCodeLoading": "requiredComponents"
+}

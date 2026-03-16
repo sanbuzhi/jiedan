@@ -1,0 +1,160 @@
+<view class="guide-container">
+  <!-- 顶部装饰区域 -->
+  <view class="header-decoration">
+    <view class="gradient-bg"></view>
+    <view class="circle-decoration circle-1"></view>
+    <view class="circle-decoration circle-2"></view>
+    <view class="circle-decoration circle-3"></view>
+  </view>
+
+  <!-- 主标题区域 -->
+  <view class="title-section">
+    <view class="logo-wrapper">
+      <image class="logo" src="/images/logo.png" mode="aspectFit"></image>
+    </view>
+    <text class="main-title">AI自助开发系统</text>
+    <text class="sub-title">智能驱动，让开发更简单</text>
+  </view>
+
+  <!-- 滚动内容区域 -->
+  <scroll-view class="content-scroll" scroll-y="true" enhanced="true" show-scrollbar="true">
+    <!-- 功能介绍区域 -->
+    <view class="section">
+      <view class="section-header">
+        <view class="section-icon">✨</view>
+        <text class="section-title">功能介绍</text>
+      </view>
+      <view class="section-content">
+        <view class="feature-item">
+          <view class="feature-icon">🤖</view>
+          <view class="feature-text">
+            <text class="feature-name">AI智能分析</text>
+            <text class="feature-desc">基于大语言模型，智能分析您的需求并生成解决方案</text>
+          </view>
+        </view>
+        <view class="feature-item">
+          <view class="feature-icon">⚡</view>
+          <view class="feature-text">
+            <text class="feature-name">快速开发</text>
+            <text class="feature-desc">自动化代码生成，大幅缩短项目开发周期</text>
+          </view>
+        </view>
+        <view class="feature-item">
+          <view class="feature-icon">🎯</view>
+          <view class="feature-text">
+            <text class="feature-name">精准匹配</text>
+            <text class="feature-desc">智能匹配最适合的技术方案和开发资源</text>
+          </view>
+        </view>
+        <view class="feature-item">
+          <view class="feature-icon">🔒</view>
+          <view class="feature-text">
+            <text class="feature-name">安全可靠</text>
+            <text class="feature-desc">企业级安全保障，保护您的数据和隐私</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 流程说明区域 -->
+    <view class="section">
+      <view class="section-header">
+        <view class="section-icon">📋</view>
+        <text class="section-title">使用流程</text>
+      </view>
+      <view class="section-content">
+        <view class="flow-container">
+          <view class="flow-item">
+            <view class="flow-number">1</view>
+            <view class="flow-content">
+              <text class="flow-title">提交需求</text>
+              <text class="flow-desc">描述您的项目需求和期望目标</text>
+            </view>
+          </view>
+          <view class="flow-arrow">↓</view>
+          <view class="flow-item">
+            <view class="flow-number">2</view>
+            <view class="flow-content">
+              <text class="flow-title">AI分析</text>
+              <text class="flow-desc">系统自动分析并生成技术方案</text>
+            </view>
+          </view>
+          <view class="flow-arrow">↓</view>
+          <view class="flow-item">
+            <view class="flow-number">3</view>
+            <view class="flow-content">
+              <text class="flow-title">确认方案</text>
+              <text class="flow-desc">查看并确认AI生成的开发方案</text>
+            </view>
+          </view>
+          <view class="flow-arrow">↓</view>
+          <view class="flow-item">
+            <view class="flow-number">4</view>
+            <view class="flow-content">
+              <text class="flow-title">开始开发</text>
+              <text class="flow-desc">系统自动执行开发任务并交付成果</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 用户须知区域 -->
+    <view class="section">
+      <view class="section-header">
+        <view class="section-icon">📌</view>
+        <text class="section-title">用户须知</text>
+      </view>
+      <view class="section-content">
+        <view class="notice-list">
+          <view class="notice-item">
+            <text class="notice-dot">•</text>
+            <text class="notice-text">请确保提供的需求描述清晰、完整，以便AI准确理解您的意图</text>
+          </view>
+          <view class="notice-item">
+            <text class="notice-dot">•</text>
+            <text class="notice-text">AI生成的方案仅供参考，最终决策权在于用户</text>
+          </view>
+          <view class="notice-item">
+            <text class="notice-dot">•</text>
+            <text class="notice-text">开发过程中可能需要您提供额外的信息或进行确认</text>
+          </view>
+          <view class="notice-item">
+            <text class="notice-dot">•</text>
+            <text class="notice-text">建议定期查看项目进度，及时反馈问题</text>
+          </view>
+          <view class="notice-item">
+            <text class="notice-dot">•</text>
+            <text class="notice-text">如遇到问题，可通过"我的"页面联系客服支持</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 免责声明区域 -->
+    <view class="section disclaimer-section">
+      <view class="section-header">
+        <view class="section-icon">⚠️</view>
+        <text class="section-title">免责声明</text>
+      </view>
+      <view class="section-content">
+        <view class="disclaimer-content">
+          <text class="disclaimer-text">1. 本系统提供的AI生成内容仅供参考，不构成专业建议。</text>
+          <text class="disclaimer-text">2. 用户应对使用本系统产生的结果自行判断和承担责任。</text>
+          <text class="disclaimer-text">3. 系统可能会因网络、技术等原因出现延迟或故障，敬请谅解。</text>
+          <text class="disclaimer-text">4. 我们保留随时修改、暂停或终止服务的权利。</text>
+          <text class="disclaimer-text">5. 使用本系统即表示您同意我们的服务条款和隐私政策。</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部留白 -->
+    <view class="bottom-space"></view>
+  </scroll-view>
+
+  <!-- 底部按钮区域 -->
+  <view class="button-section">
+    <button class="btn-primary" bindtap="onExperienceTap">体验使用</button>
+    <button class="btn-secondary" bindtap="onJoinDeveloperTap">加入开发者计划</button>
+  </view>
+</view>

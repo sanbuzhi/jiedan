@@ -1,0 +1,704 @@
+<view class="container">
+  <!-- 顶部固定导航 -->
+  <view class="header-fixed">
+    <!-- 三阶段进度指示器 -->
+    <view class="progress-bar">
+      <!-- 阶段1：需求智能解析 -->
+      <view
+        class="progress-step {{currentStage === 1 ? 'active' : ''}} {{currentStage > 1 ? 'completed' : ''}}"
+        data-stage="1"
+        bindtap="onStageTap"
+      >
+        <view class="step-number">
+          <text wx:if="{{currentStage <= 1}}">1</text>
+          <text wx:else class="step-check">✓</text>
+        </view>
+        <text class="step-text">需求智能解析</text>
+      </view>
+
+      <!-- 连接线1 -->
+      <view class="progress-line {{currentStage > 1 ? 'active' : ''}}"></view>
+
+      <!-- 阶段2：交互视觉定制 -->
+      <view
+        class="progress-step {{currentStage === 2 ? 'active' : ''}} {{currentStage > 2 ? 'completed' : ''}}"
+        data-stage="2"
+        bindtap="onStageTap"
+      >
+        <view class="step-number">
+          <text wx:if="{{currentStage <= 2}}">2</text>
+          <text wx:else class="step-check">✓</text>
+        </view>
+        <text class="step-text">交互视觉定制</text>
+      </view>
+
+      <!-- 连接线2 -->
+      <view class="progress-line {{currentStage > 2 ? 'active' : ''}}"></view>
+
+      <!-- 阶段3：AI智能报价 -->
+      <view
+        class="progress-step {{currentStage === 3 ? 'active' : ''}} {{currentStage > 3 ? 'completed' : ''}}"
+        data-stage="3"
+        bindtap="onStageTap"
+      >
+        <view class="step-number">
+          <text wx:if="{{currentStage <= 3}}">3</text>
+          <text wx:else class="step-check">✓</text>
+        </view>
+        <text class="step-text">AI智能报价</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 内容滚动区 -->
+  <scroll-view class="content-scroll" scroll-y="true" enhanced="true" show-scrollbar="false">
+    <!-- ==================== 阶段1：需求智能解析 ==================== -->
+    <view wx:if="{{currentStage === 1}}" class="stage-block">
+      <view class="stage-header">
+        <text class="stage-title">📝 需求智能解析</text>
+        <text class="stage-subtitle">请详细描述您的业务场景，AI将自动识别功能点</text>
+      </view>
+
+      <view class="stage-content">
+        <!-- 1. 业务场景描述区 -->
+        <view class="input-card">
+          <view class="input-header">
+            <text class="input-label">业务场景描述</text>
+            <text class="input-hint">{{stageData.stage1.requirementDescription.length || 0}}/1000</text>
+          </view>
+          <textarea
+            class="desc-textarea"
+            placeholder="请详细描述您的业务场景，例如：需要一套酒店管理系统，支持客房预订、入住登记、账单结算等功能"
+            maxlength="1000"
+            value="{{stageData.stage1.requirementDescription}}"
+            bindinput="onRequirementDescInput"
+          />
+        </view>
+
+        <!-- 2. 智能识别功能点触发器 -->
+        <button
+          class="analyze-btn {{stageData.stage1.requirementDescription ? 'active' : ''}} {{isAnalyzing ? 'loading' : ''}}"
+          bindtap="onAnalyzeFunctions"
+          disabled="{{!stageData.stage1.requirementDescription || isAnalyzing}}"
+        >
+          <view wx:if="{{isAnalyzing}}" class="btn-loading">
+            <view class="loading-spinner"></view>
+            <text>AI正在分析业务场景...</text>
+          </view>
+          <text wx:else>🤖 智能识别功能点</text>
+        </button>
+
+        <!-- 3. 业务角色矩阵与功能点清单 -->
+        <view wx:if="{{stageData.stage1.roles.length > 0}}" class="roles-section">
+          <view class="section-title">业务角色与功能点</view>
+
+          <!-- 角色手风琴列表 -->
+          <view class="role-accordion">
+            <view
+              wx:for="{{stageData.stage1.roles}}"
+              wx:key="index"
+              class="role-card {{item.expanded ? 'expanded' : ''}}"
+            >
+              <!-- 角色头部（可点击展开/折叠） -->
+              <view class="role-header" bindtap="onToggleRole" data-index="{{index}}">
+                <view class="role-info">
+                  <text class="role-name">{{item.name}}</text>
+                  <text class="role-desc">{{item.description}}</text>
+                </view>
+                <view class="role-toggle">
+                  <text class="toggle-icon">{{item.expanded ? '▼' : '▶'}}</text>
+                </view>
+              </view>
+
+              <!-- 功能点清单（展开时显示） -->
+              <view wx:if="{{item.expanded}}" class="function-list">
+                <view
+                  wx:for="{{item.functionList}}"
+                  wx:for-item="func"
+                  wx:key="func.id"
+                  class="function-item {{func.isCustom ? 'custom' : ''}}"
+                  bindtap="onToggleFunction"
+                  data-role-index="{{index}}"
+                  data-func-id="{{func.id}}"
+                >
+                  <!-- 复选框 -->
+                  <view class="function-checkbox {{stageData.stage1.selectedFunctionIds.indexOf(func.id) > -1 ? 'checked' : ''}}">
+                    <text wx:if="{{stageData.stage1.selectedFunctionIds.indexOf(func.id) > -1}}" class="checkbox-check">✓</text>
+                  </view>
+
+                  <!-- 功能点信息 -->
+                  <view class="function-info">
+                    <text class="function-name">{{func.name}}</text>
+                    <text wx:if="{{func.description}}" class="function-desc">{{func.description}}</text>
+                  </view>
+
+                  <!-- 复杂度标签 -->
+                  <view class="function-tags">
+                    <text class="complexity-tag {{func.complexity}}">
+                      {{func.complexity === 'low' ? '低' : func.complexity === 'medium' ? '中' : '高'}}
+                    </text>
+                    <text class="hours-tag">{{func.estimatedHours}}小时</text>
+                  </view>
+                </view>
+
+                <!-- 全选/取消全选按钮 -->
+                <view class="select-all-bar">
+                  <button
+                    class="select-all-btn"
+                    bindtap="onToggleSelectAll"
+                    data-index="{{index}}"
+                  >
+                    {{item.isAllSelected ? '取消全选' : '全选'}}
+                  </button>
+                </view>
+
+                <!-- 追加自定义功能按钮 -->
+                <view class="add-custom-bar">
+                  <button
+                    class="add-custom-btn"
+                    bindtap="onShowCustomFunctionModal"
+                    data-index="{{index}}"
+                  >
+                    <text class="add-icon">+</text>
+                    <text>追加自定义功能</text>
+                  </button>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 4. 成本智能提示 -->
+        <view wx:if="{{stageData.stage1.roles.length > 0}}" class="cost-tips-card">
+          <view class="cost-tips-icon">💡</view>
+          <view class="cost-tips-content">
+            <text class="cost-tips-text">功能点规模与开发投入正相关，建议优先选择核心功能</text>
+            <text class="estimated-price">预估开发费用：¥{{estimatedPrice}}</text>
+          </view>
+        </view>
+
+        <!-- 5. 需求物料交付区 -->
+        <view class="materials-section">
+          <view class="section-title">需求物料交付</view>
+
+          <!-- 参考素材库 -->
+          <view class="material-card">
+            <view class="material-header">
+              <text class="material-label">参考图片（最多5张）</text>
+            </view>
+
+            <!-- 图片预览区域 -->
+            <scroll-view wx:if="{{stageData.stage1.materials.referenceImages.length > 0}}" class="image-preview-scroll" scroll-x="true">
+              <view class="image-preview-list">
+                <view
+                  wx:for="{{stageData.stage1.materials.referenceImages}}"
+                  wx:key="index"
+                  class="image-preview-item"
+                >
+                  <image class="preview-image" src="{{item}}" mode="aspectFill" />
+                  <view class="delete-image-btn" bindtap="onDeleteReferenceImage" data-index="{{index}}">
+                    <text class="delete-icon">×</text>
+                  </view>
+                </view>
+              </view>
+            </scroll-view>
+
+            <!-- 图片选择按钮 -->
+            <button
+              wx:if="{{stageData.stage1.materials.referenceImages.length < 5}}"
+              class="choose-image-btn"
+              bindtap="onChooseReferenceImages"
+            >
+              <text class="btn-icon">📷</text>
+              <text>选择图片</text>
+            </button>
+          </view>
+
+          <!-- 源码资产包 -->
+          <view class="material-card">
+            <view class="material-header">
+              <text class="material-label">源码资产包（.zip格式）</text>
+            </view>
+
+            <!-- 已选文件显示 -->
+            <view wx:if="{{stageData.stage1.materials.sourceCodePackage}}" class="selected-file">
+              <text class="file-icon">📦</text>
+              <text class="file-name">{{stageData.stage1.materials.sourceCodePackage}}</text>
+              <view class="delete-file-btn" bindtap="onDeleteSourceCodePackage">
+                <text class="delete-icon">×</text>
+              </view>
+            </view>
+
+            <!-- 文件选择按钮 -->
+            <button
+              wx:if="{{!stageData.stage1.materials.sourceCodePackage}}"
+              class="choose-file-btn"
+              bindtap="onChooseSourceCodePackage"
+            >
+              <text class="btn-icon">📁</text>
+              <text>选择文件</text>
+            </button>
+          </view>
+
+          <!-- 代码仓库链接 -->
+          <view class="material-card">
+            <view class="material-header">
+              <text class="material-label">代码仓库链接</text>
+            </view>
+            <input
+              class="repo-url-input"
+              type="text"
+              placeholder="https://github.com/username/repo"
+              value="{{stageData.stage1.materials.repositoryUrl}}"
+              bindinput="onRepositoryUrlInput"
+            />
+            <text class="input-tip">支持 GitHub 或 GitLab 仓库地址</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ==================== 阶段2：交互视觉定制 ==================== -->
+    <view wx:if="{{currentStage === 2}}" class="stage-block">
+      <view class="stage-header">
+        <text class="stage-title">🎨 交互视觉定制</text>
+        <text class="stage-subtitle">选择您喜欢的视觉风格和交互方式</text>
+      </view>
+
+      <view class="stage-content">
+        <!-- 服务承诺提示 -->
+        <view class="service-promise-card">
+          <view class="promise-icon">ℹ️</view>
+          <text class="promise-text">视觉方案支持3轮免费迭代优化，确保最终交付符合预期</text>
+        </view>
+
+        <!-- 视觉方案选择卡片（网格布局） -->
+        <view class="visual-style-section">
+          <view class="section-title">选择视觉方案</view>
+          <view class="visual-style-grid">
+            <!-- 极简现代主义 -->
+            <view
+              class="visual-style-card {{stageData.stage2.visualStyle === 'minimal' ? 'selected' : ''}}"
+              data-value="minimal"
+              bindtap="onSelectVisualStyle"
+            >
+              <view class="style-preview minimal-preview">
+                <view class="preview-content">
+                  <view class="preview-line"></view>
+                  <view class="preview-line short"></view>
+                </view>
+              </view>
+              <view class="style-info">
+                <text class="style-name">极简现代主义</text>
+                <view class="style-tag-container">
+                  <text class="style-tag">简约</text>
+                </view>
+                <text class="style-desc">白色背景，简洁线条，适合工具类应用</text>
+              </view>
+              <view wx:if="{{stageData.stage2.visualStyle === 'minimal'}}" class="style-check">✓</view>
+            </view>
+
+            <!-- 商务专业风 -->
+            <view
+              class="visual-style-card {{stageData.stage2.visualStyle === 'business' ? 'selected' : ''}}"
+              data-value="business"
+              bindtap="onSelectVisualStyle"
+            >
+              <view class="style-preview business-preview">
+                <view class="preview-content">
+                  <view class="preview-block"></view>
+                  <view class="preview-text"></view>
+                </view>
+              </view>
+              <view class="style-info">
+                <text class="style-name">商务专业风</text>
+                <view class="style-tag-container">
+                  <text class="style-tag business-tag">商务</text>
+                </view>
+                <text class="style-desc">深蓝配色，稳重布局，适合企业应用</text>
+              </view>
+              <view wx:if="{{stageData.stage2.visualStyle === 'business'}}" class="style-check">✓</view>
+            </view>
+
+            <!-- 活力创意派 -->
+            <view
+              class="visual-style-card {{stageData.stage2.visualStyle === 'creative' ? 'selected' : ''}}"
+              data-value="creative"
+              bindtap="onSelectVisualStyle"
+            >
+              <view class="style-preview creative-preview">
+                <view class="preview-content">
+                  <view class="preview-circle"></view>
+                  <view class="preview-dots"></view>
+                </view>
+              </view>
+              <view class="style-info">
+                <text class="style-name">活力创意派</text>
+                <view class="style-tag-container">
+                  <text class="style-tag creative-tag">创意</text>
+                </view>
+                <text class="style-desc">明亮色彩，圆角设计，适合社交娱乐</text>
+              </view>
+              <view wx:if="{{stageData.stage2.visualStyle === 'creative'}}" class="style-check">✓</view>
+            </view>
+
+            <!-- 科技未来感 -->
+            <view
+              class="visual-style-card {{stageData.stage2.visualStyle === 'tech' ? 'selected' : ''}}"
+              data-value="tech"
+              bindtap="onSelectVisualStyle"
+            >
+              <view class="style-preview tech-preview">
+                <view class="preview-content">
+                  <view class="preview-glow"></view>
+                  <view class="preview-grid"></view>
+                </view>
+              </view>
+              <view class="style-info">
+                <text class="style-name">科技未来感</text>
+                <view class="style-tag-container">
+                  <text class="style-tag tech-tag">科技</text>
+                </view>
+                <text class="style-desc">深色背景，霓虹点缀，适合科技产品</text>
+              </view>
+              <view wx:if="{{stageData.stage2.visualStyle === 'tech'}}" class="style-check">✓</view>
+            </view>
+
+            <!-- 完全自定义 -->
+            <view
+              class="visual-style-card {{stageData.stage2.visualStyle === 'custom' ? 'selected' : ''}}"
+              data-value="custom"
+              bindtap="onSelectVisualStyle"
+            >
+              <view class="style-preview custom-preview">
+                <view class="preview-content">
+                  <view class="preview-gradient"></view>
+                  <text class="preview-icon">🎨</text>
+                </view>
+              </view>
+              <view class="style-info">
+                <text class="style-name">完全自定义</text>
+                <view class="style-tag-container">
+                  <text class="style-tag custom-tag">自定义</text>
+                </view>
+                <text class="style-desc">用户自主定义风格，打造专属视觉</text>
+              </view>
+              <view wx:if="{{stageData.stage2.visualStyle === 'custom'}}" class="style-check">✓</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 交互视觉资源库入口 -->
+        <view class="gallery-entry-section">
+          <button class="gallery-entry-btn" bindtap="onNavigateToGallery">
+            <text class="btn-icon">🖼️</text>
+            <text class="btn-text">浏览更多设计方案</text>
+            <text class="btn-arrow">›</text>
+          </button>
+        </view>
+
+        <!-- 配色方案选择（保留原有功能） -->
+        <view class="option-card">
+          <view class="option-title">配色方案（可选）</view>
+          <view class="color-list">
+            <view
+              class="color-item {{stageData.stage2.colorScheme === 'blue' ? 'selected' : ''}}"
+              data-value="blue"
+              bindtap="onSelectColorScheme"
+            >
+              <view class="color-preview blue"></view>
+              <text class="color-name">科技蓝</text>
+            </view>
+            <view
+              class="color-item {{stageData.stage2.colorScheme === 'green' ? 'selected' : ''}}"
+              data-value="green"
+              bindtap="onSelectColorScheme"
+            >
+              <view class="color-preview green"></view>
+              <text class="color-name">自然绿</text>
+            </view>
+            <view
+              class="color-item {{stageData.stage2.colorScheme === 'orange' ? 'selected' : ''}}"
+              data-value="orange"
+              bindtap="onSelectColorScheme"
+            >
+              <view class="color-preview orange"></view>
+              <text class="color-name">活力橙</text>
+            </view>
+            <view
+              class="color-item {{stageData.stage2.colorScheme === 'purple' ? 'selected' : ''}}"
+              data-value="purple"
+              bindtap="onSelectColorScheme"
+            >
+              <view class="color-preview purple"></view>
+              <text class="color-name">优雅紫</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ==================== 阶段3：AI智能报价 ==================== -->
+    <view wx:if="{{currentStage === 3}}" class="stage-block">
+      <view class="stage-header">
+        <text class="stage-title">💰 AI智能报价</text>
+        <text class="stage-subtitle">基于您的需求自动生成报价方案</text>
+      </view>
+
+      <view class="stage-content">
+        <!-- AI估价加载状态 -->
+        <view wx:if="{{isQuotationLoading}}" class="quotation-loading">
+          <view class="loading-spinner-large"></view>
+          <text class="loading-text">AI正在评估项目成本...</text>
+          <text class="loading-subtext">正在分析功能点复杂度、视觉定制需求、部署方案...</text>
+        </view>
+
+        <!-- 估价加载失败 -->
+        <view wx:elif="{{quotationLoadError}}" class="quotation-error">
+          <view class="error-icon">⚠️</view>
+          <text class="error-text">{{quotationErrorMsg || '估价失败，请稍后重试'}}</text>
+          <button class="retry-btn" bindtap="onRetryQuotation">重新估价</button>
+        </view>
+
+        <!-- 估价结果展示 -->
+        <view wx:elif="{{stageData.stage3.quotation.totalAmount >= 0}}">
+          <!-- AI研发成本卡片（可展开/折叠） -->
+          <view class="cost-card expandable" bindtap="onToggleCard" data-card="aiDevelopment">
+            <view class="cost-card-header">
+              <view class="cost-card-title">
+                <text class="cost-title-text">AI研发成本</text>
+                <view class="expand-arrow {{expandedCards.aiDevelopment ? 'expanded' : ''}}">
+                  <text class="arrow-icon">▼</text>
+                </view>
+              </view>
+              <text class="cost-amount primary">¥{{stageData.stage3.quotation.breakdown.aiDevelopmentCost}}</text>
+            </view>
+
+            <!-- 展开后的明细 -->
+            <view wx:if="{{expandedCards.aiDevelopment}}" class="cost-card-body">
+              <view wx:for="{{stageData.stage3.quotation.breakdown.developmentPhases}}" wx:key="index" class="phase-item">
+                <view class="phase-header">
+                  <text class="phase-name">{{item.phaseName}}</text>
+                  <text class="phase-cost">¥{{item.cost}}</text>
+                </view>
+                <text class="phase-desc">{{item.description}}</text>
+                <view class="phase-items">
+                  <text wx:for="{{item.items}}" wx:for-item="subItem" wx:key="subIndex" class="phase-subitem">{{subItem}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- 平台服务费卡片 -->
+          <view class="cost-card">
+            <view class="cost-card-header">
+              <text class="cost-title-text">平台服务费</text>
+              <text class="cost-amount">¥{{stageData.stage3.quotation.breakdown.platformServiceFee}}</text>
+            </view>
+            <text class="cost-note">平台运营与技术支持费用（20%）</text>
+          </view>
+
+          <!-- 基础设施成本卡片（根据deploymentMode条件显示） -->
+          <view wx:if="{{stageData.stage2.deploymentMode !== 'none' && stageData.stage3.quotation.breakdown.infrastructure}}" class="cost-card expandable" bindtap="onToggleCard" data-card="infrastructure">
+            <view class="cost-card-header">
+              <view class="cost-card-title">
+                <text class="cost-title-text">基础设施成本</text>
+                <view class="expand-arrow {{expandedCards.infrastructure ? 'expanded' : ''}}">
+                  <text class="arrow-icon">▼</text>
+                </view>
+              </view>
+              <text class="cost-amount">¥{{stageData.stage3.quotation.breakdown.infrastructureCost || 0}}</text>
+            </view>
+
+            <!-- 展开后的明细 -->
+            <view wx:if="{{expandedCards.infrastructure}}" class="cost-card-body">
+              <view class="infra-item" wx:if="{{stageData.stage3.quotation.breakdown.infrastructure.server}}">
+                <view class="infra-main">
+                  <text class="infra-name">{{stageData.stage3.quotation.breakdown.infrastructure.server.name || '云服务器'}}</text>
+                  <text class="infra-cost">¥{{stageData.stage3.quotation.breakdown.infrastructure.server.cost || 0}}</text>
+                </view>
+                <text class="infra-config">{{stageData.stage3.quotation.breakdown.infrastructure.server.config || '标准配置'}}</text>
+              </view>
+              <view class="infra-item" wx:if="{{stageData.stage3.quotation.breakdown.infrastructure.domain}}">
+                <text class="infra-name">{{stageData.stage3.quotation.breakdown.infrastructure.domain.name || '域名'}}</text>
+                <text class="infra-cost">¥{{stageData.stage3.quotation.breakdown.infrastructure.domain.cost || 0}}</text>
+              </view>
+              <view class="infra-item" wx:if="{{stageData.stage3.quotation.breakdown.infrastructure.ssl}}">
+                <text class="infra-name">{{stageData.stage3.quotation.breakdown.infrastructure.ssl.name || 'SSL证书'}}</text>
+                <text class="infra-cost">¥{{stageData.stage3.quotation.breakdown.infrastructure.ssl.cost || 0}}</text>
+              </view>
+              <view class="infra-item" wx:if="{{stageData.stage3.quotation.breakdown.infrastructure.cdn}}">
+                <view class="infra-main">
+                  <text class="infra-name">{{stageData.stage3.quotation.breakdown.infrastructure.cdn.name || 'CDN加速'}}</text>
+                  <text class="infra-optional" wx:if="{{stageData.stage3.quotation.breakdown.infrastructure.cdn.optional}}">可选</text>
+                  <text class="infra-cost">¥{{stageData.stage3.quotation.breakdown.infrastructure.cdn.cost || 0}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- 总预算展示 -->
+          <view class="total-budget-card">
+            <view class="budget-header">
+              <text class="budget-label">总预算</text>
+              <text class="budget-currency">CNY</text>
+            </view>
+            <view class="budget-amount">
+              <text class="budget-symbol">¥</text>
+              <text class="budget-value">{{stageData.stage3.quotation.totalAmount}}</text>
+            </view>
+            <view class="budget-timeline">
+              <text class="timeline-icon">⏱️</text>
+              <text class="timeline-text">预计交付周期：{{stageData.stage3.quotation.estimatedDays}}个工作日</text>
+            </view>
+          </view>
+
+          <!-- 服务承诺展示 -->
+          <view class="service-promises">
+            <text class="promises-title">服务承诺</text>
+            <view class="promises-grid">
+              <view class="promise-card">
+                <view class="promise-icon">✅</view>
+                <text class="promise-title">100%交付承诺</text>
+                <text class="promise-desc">项目完整交付，不遗漏功能</text>
+              </view>
+              <view class="promise-card">
+                <view class="promise-icon">😊</view>
+                <text class="promise-title">满意为止承诺</text>
+                <text class="promise-desc">不满意调整到满意为止</text>
+              </view>
+              <view class="promise-card">
+                <view class="promise-icon">💰</view>
+                <text class="promise-title">一次收费承诺</text>
+                <text class="promise-desc">一次收费，后续调整不收费</text>
+              </view>
+              <view class="promise-card">
+                <view class="promise-icon">🛡️</view>
+                <text class="promise-title">全额退款承诺</text>
+                <text class="promise-desc">不满意可全额退款</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 重新生成按钮 -->
+          <button
+            class="regenerate-btn {{isLoading ? 'loading' : ''}}"
+            bindtap="onRegenerateQuote"
+            disabled="{{isLoading}}"
+          >
+            <text wx:if="{{!isLoading}}">🔄 重新生成报价</text>
+            <text wx:else>生成中...</text>
+          </button>
+
+          <!-- 提示信息 -->
+          <view class="tips-card">
+            <text class="tips-icon">💡</text>
+            <text class="tips-text">报价仅供参考，最终价格可能根据详细需求调整。确认后我们的客服将在24小时内与您联系。</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部留白 -->
+    <view class="bottom-space"></view>
+  </scroll-view>
+
+  <!-- 自定义功能弹窗 -->
+  <view wx:if="{{showCustomFunctionModal}}" class="modal-overlay" bindtap="onCloseCustomFunctionModal">
+    <view class="modal-content" catchtap="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">追加自定义功能</text>
+        <view class="modal-close" bindtap="onCloseCustomFunctionModal">
+          <text>×</text>
+        </view>
+      </view>
+
+      <view class="modal-body">
+        <!-- 功能名称 -->
+        <view class="form-item">
+          <text class="form-label required">功能名称</text>
+          <input
+            class="form-input"
+            type="text"
+            placeholder="请输入功能名称"
+            value="{{customFunctionForm.name}}"
+            bindinput="onCustomFunctionNameInput"
+          />
+        </view>
+
+        <!-- 功能描述 -->
+        <view class="form-item">
+          <text class="form-label">功能描述</text>
+          <textarea
+            class="form-textarea"
+            placeholder="请输入功能描述（选填）"
+            value="{{customFunctionForm.description}}"
+            bindinput="onCustomFunctionDescInput"
+          />
+        </view>
+
+        <!-- 复杂度选择 -->
+        <view class="form-item">
+          <text class="form-label required">复杂度</text>
+          <view class="complexity-options">
+            <view
+              class="complexity-option {{customFunctionForm.complexity === 'low' ? 'selected' : ''}}"
+              data-value="low"
+              bindtap="onSelectComplexity"
+            >
+              <text class="complexity-name">低</text>
+              <text class="complexity-hours">约4小时</text>
+            </view>
+            <view
+              class="complexity-option {{customFunctionForm.complexity === 'medium' ? 'selected' : ''}}"
+              data-value="medium"
+              bindtap="onSelectComplexity"
+            >
+              <text class="complexity-name">中</text>
+              <text class="complexity-hours">约8小时</text>
+            </view>
+            <view
+              class="complexity-option {{customFunctionForm.complexity === 'high' ? 'selected' : ''}}"
+              data-value="high"
+              bindtap="onSelectComplexity"
+            >
+              <text class="complexity-name">高</text>
+              <text class="complexity-hours">约16小时</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="modal-footer">
+        <button class="modal-btn cancel" bindtap="onCloseCustomFunctionModal">取消</button>
+        <button class="modal-btn confirm" bindtap="onConfirmCustomFunction">确认添加</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部固定操作栏 -->
+  <view class="footer-fixed">
+    <view class="footer-actions">
+      <!-- 上一步按钮（非第一阶段显示） -->
+      <button
+        wx:if="{{currentStage > 1}}"
+        class="prev-btn"
+        bindtap="onPrev"
+        disabled="{{isLoading}}"
+      >
+        上一步
+      </button>
+
+      <!-- 下一步/完成按钮 -->
+      <button
+        class="next-btn {{isLoading ? 'loading' : ''}}"
+        bindtap="onNextStep"
+        disabled="{{isLoading}}"
+      >
+        <text wx:if="{{currentStage < 3 && !isLoading}}">下一步</text>
+        <text wx:if="{{currentStage === 3 && !isLoading}}">完成提交</text>
+        <text wx:if="{{isLoading}}">处理中...</text>
+      </button>
+    </view>
+  </view>
+</view>

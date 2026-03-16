@@ -1,0 +1,39 @@
+<view class="suggestion-container">
+  <view class="header">
+    <text class="title">提交建议</text>
+    <text class="subtitle">帮助AI更好地理解您的需求</text>
+  </view>
+
+  <view class="content">
+    <view class="input-section">
+      <textarea
+        class="suggestion-input"
+        placeholder="请输入您的建议或修改意见..."
+        bindinput="onSuggestionInput"
+        value="{{suggestion}}"
+        maxlength="1000"
+        auto-height
+      />
+      <text class="word-count">{{suggestion.length}}/1000</text>
+    </view>
+
+    <view class="action-section">
+      <button 
+        class="btn btn-primary" 
+        bindtap="handleSubmit"
+        loading="{{loading}}"
+        disabled="{{loading || !suggestion}}"
+      >
+        提交建议
+      </button>
+      
+      <button 
+        class="btn btn-cancel" 
+        bindtap="handleCancel"
+        disabled="{{loading}}"
+      >
+        取消
+      </button>
+    </view>
+  </view>
+</view>

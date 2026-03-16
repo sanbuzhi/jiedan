@@ -1,0 +1,4 @@
+INSERT INTO requirements (user_id, user_type, project_type, need_online, traffic, urgency, delivery_period, ui_style, status, budget_calculated, step_data, flow_node_status, current_flow_node, created_at, updated_at) VALUES 
+(1, '个人', '微信小程序', true, '{"totalUsers":5000,"dau":500,"concurrent":100}', 'NORMAL', 14, '现代简约', 'PROCESSING', '{"aiDevelopmentFee":5000,"platformServiceFee":1000,"totalBudget":6000}', '{"step1":{"userType":"个人","projectType":"微信小程序"}}', 
+'[{"title":"需求提交","desc":"已提交需求","status":"completed"},{"title":"需求审核","desc":"审核通过","status":"completed"},{"title":"方案设计","desc":"正在进行","status":"active"},{"title":"开发实现","desc":"等待中","status":"pending"},{"title":"测试验收","desc":"等待中","status":"pending"},{"title":"上线部署","desc":"等待中","status":"pending"},{"title":"项目交付","desc":"等待中","status":"pending"}]', 
+2, NOW(), NOW());

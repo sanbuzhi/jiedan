@@ -1,0 +1,40 @@
+<view class="approve-container">
+  <view class="header">
+    <text class="title">客户验收</text>
+    <text class="subtitle">{{stageName}}</text>
+  </view>
+
+  <view class="content">
+    <view class="info-section">
+      <text class="info-text">AI已完成 {{stageName}} 阶段</text>
+      <text class="info-desc">请确认是否继续下一阶段</text>
+    </view>
+
+    <view class="action-section">
+      <button 
+        class="btn btn-primary" 
+        bindtap="handleContinue"
+        loading="{{actionLoading}}"
+        disabled="{{actionLoading}}"
+      >
+        继续 (Continue)
+      </button>
+      
+      <button 
+        class="btn btn-secondary" 
+        bindtap="handleRetry"
+        disabled="{{actionLoading}}"
+      >
+        重试 (Retry) + 建议
+      </button>
+      
+      <button 
+        class="btn btn-cancel" 
+        bindtap="handleCancel"
+        disabled="{{actionLoading}}"
+      >
+        取消
+      </button>
+    </view>
+  </view>
+</view>

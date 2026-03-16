@@ -1,0 +1,946 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  background-color: #f5f5f5;
+}
+
+/* 顶部固定 */
+.header-fixed {
+  flex-shrink: 0;
+  padding: 30rpx 30rpx 0;
+  background-color: #ffffff;
+}
+
+/* 进度指示器 */
+.progress-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 0 40rpx;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.progress-step.active .step-number {
+  background-color: #07c160;
+  color: #ffffff;
+}
+
+.progress-step.active .step-text {
+  color: #07c160;
+}
+
+.progress-step.completed .step-number {
+  background-color: #07c160;
+  color: #ffffff;
+}
+
+.progress-step.completed .step-text {
+  color: #07c160;
+}
+
+.step-number {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  color: #999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: bold;
+  margin-bottom: 8rpx;
+}
+
+.step-text {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.progress-line {
+  width: 80rpx;
+  height: 2rpx;
+  background-color: #e0e0e0;
+  margin: 0 20rpx;
+  margin-bottom: 30rpx;
+}
+
+.progress-line.active {
+  background-color: #07c160;
+}
+
+.progress-line.completed {
+  background-color: #07c160;
+}
+
+/* 页面标题 */
+.page-header {
+  text-align: center;
+  margin-bottom: 40rpx;
+}
+
+.page-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 12rpx;
+}
+
+.page-subtitle {
+  display: block;
+  font-size: 28rpx;
+  color: #999999;
+}
+
+/* 中部可滚动 */
+.content-scroll {
+  flex: 1;
+  height: 0;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.content-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 底部留白 */
+.bottom-space {
+  height: 100rpx;
+}
+
+/* 底部固定 */
+.footer-fixed {
+  flex-shrink: 0;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background-color: #ffffff;
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.08);
+}
+
+/* ==================== Step 1 & 2: 选项卡片 ==================== */
+.options-card {
+  width: 690rpx;
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+  margin: 20rpx auto 0;
+  box-sizing: border-box;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  transition: all 0.2s ease;
+  border: 2rpx solid transparent;
+}
+
+.option-item:last-child {
+  margin-bottom: 0;
+}
+
+.option-item.selected {
+  background-color: #f0fff4;
+  border-color: #07c160;
+}
+
+.option-item:active {
+  background-color: #f5f5f5;
+}
+
+.option-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  margin-right: 24rpx;
+  flex-shrink: 0;
+}
+
+/* Step 1 图标颜色 */
+.option-icon.company {
+  background-color: #e6f7ff;
+}
+
+.option-icon.individual {
+  background-color: #fff7e6;
+}
+
+.option-icon.student {
+  background-color: #f6ffed;
+}
+
+/* Step 2 图标颜色 */
+.option-icon.wechat {
+  background-color: #e6f7ff;
+}
+
+.option-icon.douyin {
+  background-color: #fff0f0;
+}
+
+.option-icon.website {
+  background-color: #f6ffed;
+}
+
+.option-icon.crawler {
+  background-color: #fff7e6;
+}
+
+/* 通用图标颜色 */
+.option-icon.unclear {
+  background-color: #f5f5f5;
+}
+
+.option-icon.other {
+  background-color: #f9f0ff;
+}
+
+.option-content {
+  flex: 1;
+}
+
+.option-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.option-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.option-check {
+  margin-left: 20rpx;
+}
+
+.check-circle {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 4rpx solid #e0e0e0;
+  transition: all 0.2s ease;
+}
+
+.check-circle.checked {
+  background-color: #07c160;
+  border-color: #07c160;
+  position: relative;
+}
+
+.check-circle.checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background-color: #ffffff;
+}
+
+/* 其他输入框 */
+.other-input-wrapper {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.other-input-wrapper.show {
+  max-height: 200rpx;
+  padding-top: 20rpx;
+}
+
+.other-input {
+  width: 100%;
+  height: 88rpx;
+  background-color: #f5f5f5;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  color: #333333;
+  box-sizing: border-box;
+}
+
+.other-input::placeholder {
+  color: #999999;
+}
+
+/* ==================== Step 3: 上线需求 ==================== */
+.card {
+  width: 690rpx;
+  background-color: #ffffff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin: 0 auto 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.form-item:last-of-type {
+  border-bottom: none;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.label-text {
+  font-size: 32rpx;
+  color: #333333;
+  font-weight: 500;
+}
+
+.label-unit {
+  font-size: 26rpx;
+  color: #999999;
+  margin-left: 8rpx;
+}
+
+.form-input {
+  flex: 1;
+  margin-left: 30rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  background-color: #f5f5f5;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  text-align: right;
+  border: 2rpx solid transparent;
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  background-color: #ffffff;
+  border-color: #07c160;
+}
+
+.form-input.error {
+  background-color: #fff2f0;
+  border-color: #ff4d4f;
+}
+
+.error-text {
+  display: block;
+  font-size: 24rpx;
+  color: #ff4d4f;
+  margin-top: -16rpx;
+  margin-bottom: 16rpx;
+  padding-left: 8rpx;
+}
+
+/* 信息框 */
+.info-box {
+  margin-top: 30rpx;
+  padding: 24rpx;
+  background-color: #f5f5f5;
+  border-radius: 12rpx;
+  display: flex;
+  transition: all 0.3s ease;
+}
+
+.info-box.active {
+  background-color: #e6f7ff;
+  border: 1rpx solid #91d5ff;
+}
+
+.info-box .info-icon {
+  font-size: 36rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.info-box .info-content {
+  flex: 1;
+}
+
+.info-box .info-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 12rpx;
+}
+
+.info-box .info-text {
+  display: block;
+  font-size: 26rpx;
+  color: #666666;
+  margin-bottom: 16rpx;
+}
+
+.info-box .info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.info-box .info-item {
+  display: flex;
+  align-items: center;
+}
+
+.info-box .item-dot {
+  color: #07c160;
+  font-size: 28rpx;
+  margin-right: 12rpx;
+}
+
+.info-box .item-text {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+/* 提示框 */
+.tip-box {
+  margin-top: 30rpx;
+  padding: 20rpx 24rpx;
+  background-color: #fffbe6;
+  border: 1rpx solid #ffe58f;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+}
+
+.tip-icon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+}
+
+.tip-text {
+  font-size: 26rpx;
+  color: #ad8b00;
+  flex: 1;
+}
+
+/* 费用卡片 - Step 3 */
+.fee-card {
+  background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+  border: 1rpx solid #b7eb8f;
+}
+
+.fee-header {
+  margin-bottom: 20rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.fee-header .fee-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+.fee-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.fee-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fee-name {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+.fee-price {
+  font-size: 28rpx;
+  color: #07c160;
+  font-weight: 500;
+}
+
+.fee-note {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-top: 20rpx;
+  text-align: center;
+}
+
+/* ==================== Step 4: 流量预估 ==================== */
+/* 信息卡片 - 清新简洁风 */
+.info-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+  padding: 32rpx;
+}
+
+.info-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 28rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.info-header .info-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.info-header .info-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.info-card .info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.info-card .info-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 20rpx;
+  background: #fafafa;
+  border-radius: 12rpx;
+}
+
+.item-marker {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  margin-top: 14rpx;
+  flex-shrink: 0;
+}
+
+.item-marker.total {
+  background-color: #1890ff;
+}
+
+.item-marker.daily {
+  background-color: #07c160;
+}
+
+.item-marker.concurrent {
+  background-color: #fa8c16;
+}
+
+.item-content {
+  flex: 1;
+}
+
+.item-content .item-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.item-content .item-desc {
+  display: block;
+  font-size: 26rpx;
+  color: #666666;
+  line-height: 1.5;
+}
+
+/* 配置建议卡片 */
+.suggest-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+  padding: 32rpx;
+}
+
+.suggest-header {
+  margin-bottom: 28rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.suggest-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.suggest-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.suggest-level {
+  padding: 24rpx;
+  border-radius: 16rpx;
+  text-align: center;
+}
+
+.suggest-level.basic {
+  background-color: #f0f9ff;
+}
+
+.suggest-level.standard {
+  background-color: #f6ffed;
+}
+
+.suggest-level.advanced {
+  background-color: #fffbe6;
+}
+
+.suggest-level.enterprise {
+  background-color: #f9f0ff;
+}
+
+.level-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.level-desc {
+  display: block;
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.suggest-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  background-color: #fafafa;
+  padding: 24rpx;
+  border-radius: 12rpx;
+}
+
+.spec-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8rpx 0;
+}
+
+.spec-label {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+.spec-value {
+  font-size: 28rpx;
+  color: #333333;
+  font-weight: 600;
+}
+
+.suggest-price {
+  display: block;
+  font-size: 30rpx;
+  color: #07c160;
+  font-weight: 600;
+  text-align: center;
+  padding: 20rpx;
+  background-color: #f6ffed;
+  border-radius: 12rpx;
+}
+
+/* ==================== Step 5: 交付周期 ==================== */
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 24rpx;
+}
+
+/* 紧急程度列表 */
+.urgency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.urgency-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 24rpx;
+  background-color: #fafafa;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.urgency-item.active {
+  background-color: #f0f9ff;
+  border-color: #1890ff;
+}
+
+.urgency-icon {
+  font-size: 44rpx;
+  margin-right: 20rpx;
+}
+
+.urgency-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.urgency-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.urgency-time {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.urgency-check {
+  width: 40rpx;
+  height: 40rpx;
+  background-color: #1890ff;
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: bold;
+}
+
+.urgency-tag {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  background-color: #fa8c16;
+  color: #ffffff;
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-weight: bold;
+}
+
+.urgency-tag.hot {
+  background-color: #ff4d4f;
+}
+
+/* Picker 样式 */
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.picker-label {
+  font-size: 30rpx;
+  color: #333333;
+}
+
+.picker-value {
+  display: flex;
+  align-items: center;
+}
+
+.value-text {
+  font-size: 30rpx;
+  color: #07c160;
+  font-weight: 500;
+  margin-right: 12rpx;
+}
+
+.picker-arrow {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+.day-hint {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  margin-top: 16rpx;
+  padding-left: 8rpx;
+}
+
+/* 费用卡片 - Step 5 */
+.fee-card .fee-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 28rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.fee-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.fee-card .fee-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.fee-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+  padding: 0 8rpx;
+}
+
+.fee-label {
+  font-size: 30rpx;
+  color: #666666;
+}
+
+.fee-amount {
+  font-size: 52rpx;
+  font-weight: 600;
+  color: #ff4d4f;
+}
+
+.fee-detail {
+  padding: 20rpx;
+  background-color: #fffbe6;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.detail-text {
+  font-size: 26rpx;
+  color: #ad8b00;
+}
+
+/* Step 5 信息卡片 */
+.info-card .info-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 20rpx;
+  background: #fafafa;
+  border-radius: 12rpx;
+}
+
+.info-card .item-dot {
+  color: #07c160;
+  font-size: 28rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.info-card .item-text {
+  font-size: 28rpx;
+  color: #555555;
+  line-height: 1.6;
+}
+
+/* ==================== 底部固定区域 ==================== */
+/* 提示卡片 */
+.tips-card {
+  display: flex;
+  align-items: flex-start;
+  background-color: #fffbe6;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #ffe58f;
+}
+
+.tips-icon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.tips-text {
+  font-size: 26rpx;
+  color: #d48806;
+  line-height: 1.6;
+  flex: 1;
+}
+
+/* 底部按钮 */
+.footer-actions {
+  display: flex;
+  gap: 20rpx;
+  width: 100%;
+}
+
+.prev-btn {
+  flex: 1;
+  height: 96rpx;
+  line-height: 96rpx;
+  background-color: #f5f5f5;
+  color: #666666;
+  border-radius: 16rpx;
+  font-size: 34rpx;
+  font-weight: 500;
+  text-align: center;
+  border: none;
+}
+
+.prev-btn::after {
+  border: none;
+}
+
+.prev-btn:active {
+  background-color: #e8e8e8;
+}
+
+.next-btn {
+  flex: 1;
+  height: 96rpx;
+  line-height: 96rpx;
+  background-color: #07c160;
+  color: #ffffff;
+  border-radius: 16rpx;
+  font-size: 34rpx;
+  font-weight: 500;
+  text-align: center;
+  border: none;
+}
+
+.next-btn::after {
+  border: none;
+}
+
+.next-btn:active {
+  background-color: #06ad56;
+}

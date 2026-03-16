@@ -1,0 +1,78 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+  servlet:
+    context-path: /api
+  # 【增加超时配置】支持长连接AI调用（10分钟+缓冲）
+  tomcat:
+    connection-timeout: 720000        # 连接超时：12分钟（720秒）
+    keep-alive-timeout: 720000        # Keep-Alive超时：12分钟
+    max-connections: 1000             # 最大连接数
+    accept-count: 200                 # 等待队列长度
+    threads:
+      max: 200                        # 最大线程数
+      min-spare: 20                   # 最小空闲线程数
+
+spring:
+  application:
+    name: jiedan-backend
+  
+  datasource:
+    url: jdbc:mysql://localhost:3306/jiedan?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true&characterEncoding=UTF-8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+  
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 2MB
+      max-request-size: 10MB
+
+jwt:
+  secret: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
+  expiration: ${JWT_EXPIRATION:2592000000}
+
+wechat:
+  appid: wx3da9549afa79161a
+  secret: 44d3c4dc04b75f1d65ba799a277ff5d7
+
+app:
+  upload:
+    avatar-path: ${user.dir}/uploads/avatars/
+    avatar-url-prefix: /uploads/avatars/
+    default-avatar: default-avatar.png
+
+logging:
+  level:
+    root: INFO
+    com.jiedan: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# AI配置
+ai:
+  huoshan:
+    api-key: e492b8fd-34cf-4016-a7bb-f3bb055135bc
+    base-url: https://ark.cn-beijing.volces.com/api/coding/v3
+    default-model: doubao-seed-2.0-code
+    timeout: 30000

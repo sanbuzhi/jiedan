@@ -1,0 +1,10 @@
+package com.jiedan.entity.enums;
+
+public enum DevelopmentPhase {
+    REQUIREMENT_ANALYSIS,
+    ARCHITECTURE_DESIGN,
+    PROGRAMMING_DEVELOPMENT,
+    TESTING_ACCEPTANCE,
+    PERFORMANCE_OPTIMIZATION,
+    SECURITY_HARDENING
+}
