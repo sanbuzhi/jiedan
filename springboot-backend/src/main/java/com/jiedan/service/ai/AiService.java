@@ -100,16 +100,15 @@ public class AiService {
 
         // 【简化】直接要求生成Markdown文档
         StringBuilder systemPrompt = new StringBuilder("""
-                你是一位专业的需求分析师。请根据用户需求，生成一份完整的需求文档。
+                你是拥有10年软件行业经验的资深需求分析师。请根据用户需求，生成一份完整的需求文档。
+                请确保用户需求无遗漏，以及以下要求均满足，再交付。
 
                 要求：
                 1. 使用Markdown格式
                 2. 包含以下内容：
                    - 需求概述
-                   - 功能模块清单（必须完整列出所有模块，不能遗漏）
-                   - 用户角色定义
-                   - 核心业务流程
-                   - 非功能性需求建议（可选）
+                   - 系统用户角色（角色名、定位、职责、权限范围）
+                   - 功能模块清单（按系统用户角色分组，每个角色下含「模块→子模块→功能」）
                 3. 文档要详细、完整、可实施
                 4. 直接输出Markdown文档，不需要JSON格式
                 5. 【重要】必须生成完整的文档，不能截断，确保所有模块都描述完整
@@ -127,23 +126,12 @@ public class AiService {
         // 【简化】只使用需求描述
         String userPrompt = "用户需求：" + request.getRequirementDescription();
 
-        // 调用AI（不设置maxTokens，使用模型最大容量）
-        AiChatRequest chatRequest = AiChatRequest.builder()
-                .temperature(0.7)
-                .build()
-                .addSystemMessage(systemPrompt.toString())
-                .addUserMessage(userPrompt);
-
-        AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
-
-        if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
-            log.error("AI明确需求失败: {}", chatResponse.getErrorMessage());
-            throw new RuntimeException("AI明确需求失败: " + chatResponse.getErrorMessage());
-        }
+        // 【修复】使用续传机制，避免文档被截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt, 8000, 5);
 
         // 【简化】直接返回文档内容
         return ClarifyRequirementResponse.builder()
-                .documentContent(chatResponse.getContent())
+                .documentContent(fullContent)
                 .build();
     }
 
@@ -199,26 +187,86 @@ public class AiService {
 
     /**
      * 单次执行AI拆分任务
-     * 【简化】直接生成Markdown文档，不解析具体字段
+     * 【优化】生成程序员可用的详细技术任务书，包含前后端具体开发任务
      * @param previousIssues 之前验证的问题列表（重试时携带）
      */
     private SplitTasksResponse executeSplitTasksOnce(SplitTasksRequest request, List<String> previousIssues) {
         // 使用默认策略（传入null获取默认策略）
         AIProviderStrategy strategy = strategyFactory.getStrategy(null);
 
-        // 【简化】直接要求生成Markdown文档
+        // 【优化】生成AI自动开发可用的详细技术任务书
         StringBuilder systemPrompt = new StringBuilder("""
-                你是一位专业的项目经理。请根据需求文档，生成详细的任务拆分文档。
+                你是一位20年资历的AI技术架构师，需生成供AI代码生成接口直接执行使用的详细技术任务书。
 
-                要求：
-                1. 使用Markdown格式
-                2. 包含以下内容：
-                   - 任务列表（每个任务包含名称、描述、预估工时、优先级）
-                   - 任务依赖关系
-                   - 关键里程碑
-                3. 任务要可执行、可跟踪
-                4. 直接输出Markdown文档，不需要JSON格式
-                5. 【重要】必须生成完整的文档，不能截断，确保所有任务都描述完整
+                【任务书要求】
+                使用Markdown格式
+                
+                ## 核心输出要求
+                1. 格式：纯Markdown，无解释性备注、无重复内容、无未完成截断内容；
+                2. 粒度：所有指令需可直接映射为代码逻辑，每章节内容仅保留AI生成代码必需的核心信息；
+                3. 完整性：覆盖全流程可运行代码生成所需的技术规格、接口、数据库、业务规则，不截断；
+                4. 适配性：按AI单次生成能力拆分逻辑（但文档结构完整），避免冗余token占用。
+                
+                ## 任务书必须包含的章节（仅保留以下核心内容）
+
+                ### 1. 项目技术规格
+                - 技术栈确定：明确版本号（前端：微信小程序/VUE/html+css+js；后端：Spring Boot+MyBatis/Node.js；数据库：MySQL；接口：RESTful API、UTF-8）；
+                - 项目结构规范：仅保留前端/后端核心代码目录（删test目录、废弃目录、非核心配置文件）；
+                - 代码生成规则：仅保留可落地的约束（依赖版本固定、输入双重校验、敏感信息放配置、接口统一Result返回、JWT登录校验）。
+
+                ### 2. 前端页面开发清单
+                按模块（首页/商品/购物车/订单/用户）列出页面，每个页面仅包含：
+                - 页面名称+路径（如pages/index/index）；
+                - 核心功能描述（无冗余修饰）；
+                - 必用组件（仅列实际代码引用的组件名）；
+                - 接口调用清单（URL+请求方式）；
+                - 页面跳转关系（仅列核心跳转路径+参数）。
+                
+                ### 3. 后端接口开发清单
+                按模块（首页/商品/购物车/订单/用户）列出接口，每个接口仅包含：
+                - 接口URL+请求方式（如GET /api/v1/banners）；
+                - 请求参数（字段名+类型+是否必填+校验规则）；
+                - 响应数据格式（字段名+类型+统一Result包装）；
+                - 核心业务逻辑（仅保留代码可实现的逻辑，无冗余描述）；
+                - 关联数据库表名。
+                
+                ### 4. 数据库表结构设计
+                按业务模块设计表，每个表仅包含：
+                - 表名+核心用途；
+                - 字段定义（字段名+数据类型+约束+默认值+注释）；
+                - 主键/外键/索引（仅核心索引）；
+                - 表间关联关系（简洁描述）。
+                
+                ### 5. 业务逻辑规则
+                仅保留可代码化的核心规则：
+                - 核心业务流程（如“登录→加购→下单→支付→自提”）；
+                - 数据校验规则（前端表单+后端参数校验的具体规则）；
+                - 状态流转规则（订单状态：待付款/待自提/已完成的触发条件）；
+                - 异常处理规则（接口异常、登录失效、参数错误的返回逻辑）。
+                
+                ### 6. 开发执行顺序
+                按依赖优先级拆分，仅列核心阶段：
+                - 阶段1：数据库表创建（按依赖顺序）；
+                - 阶段2：后端接口开发（按“基础通用→首页→商品→购物车→订单→用户”）；
+                - 阶段3：前端页面开发（同接口依赖顺序）；
+                - 阶段4：接口联调（核心联调规则）。
+                
+                ### 7. 代码生成规范
+                仅保留可落地的命名/结构/注释规则：
+                - 命名规范：类名（大驼峰）、方法名（小驼峰）、变量名（小驼峰）、表名（下划线+小写）、字段名（下划线+小写）；
+                - 代码结构：前端请求封装/存储封装规范、后端Controller/Service/Mapper分层规范；
+                - 注释要求：接口/核心方法必须加注释（参数/返回值/业务说明）；
+                - 错误码定义：统一错误码枚举（如SUCCESS=200、LOGIN_EXPIRE=401、PARAM_ERROR=400）。
+                
+                ## 禁止项
+                1. 不添加解释性备注（如“供AI测试验证”“增强体验”等）；
+                2. 不重复描述规则（如“可运行代码”仅提1次）；
+                3. 不包含非核心目录/文件（如test、README.md、废弃目录）；
+                4. 不出现未完成截断内容；
+                5. 不使用冗余修饰词，所有描述需直接指向代码实现。
+                
+                ## 输出要求
+                直接输出完整Markdown任务书，无前置说明、无JSON格式、无截断，确保AI可直接按文档分模块生成100%可运行代码。
                 """);
 
         // 【重试时】携带之前的反馈建议
@@ -233,23 +281,12 @@ public class AiService {
         // 【简化】直接使用需求文档内容
         String userPrompt = "需求文档：\n" + request.getRequirementDoc();
 
-        // 调用AI（不设置maxTokens，使用模型最大容量）
-        AiChatRequest chatRequest = AiChatRequest.builder()
-                .temperature(0.7)
-                .build()
-                .addSystemMessage(systemPrompt.toString())
-                .addUserMessage(userPrompt);
-
-        AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
-
-        if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
-            log.error("AI拆分任务失败: {}", chatResponse.getErrorMessage());
-            throw new RuntimeException("AI拆分任务失败: " + chatResponse.getErrorMessage());
-        }
+        // 【修复】使用续传机制，避免文档被截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt, 8000, 5);
 
         // 【简化】直接返回文档内容
         return SplitTasksResponse.builder()
-                .documentContent(chatResponse.getContent())
+                .documentContent(fullContent)
                 .build();
     }
 
@@ -384,27 +421,15 @@ public class AiService {
             userPrompt.append("\n特殊要求：").append(String.join(", ", request.getRequirements()));
         }
 
-        // 调用AI（不设置maxTokens，使用模型最大容量）
-        AiChatRequest chatRequest = AiChatRequest.builder()
-                .model(request.getModel())
-                .temperature(0.3) // 代码生成使用较低temperature
-                .build()
-                .addSystemMessage(systemPrompt.toString())
-                .addUserMessage(userPrompt.toString());
-
-        AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
-
-        if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
-            log.error("AI生成代码失败: {}", chatResponse.getErrorMessage());
-            throw new RuntimeException("AI生成代码失败: " + chatResponse.getErrorMessage());
-        }
+        // 【修复】使用续传机制，避免代码被截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt.toString(), 8000, 5);
 
         // 构建响应（暂不设置success，由重试服务设置）
         return GenerateCodeResponse.builder()
-                .code(chatResponse.getContent())
+                .code(fullContent)
                 .explanation("代码已生成，请查看代码注释了解详细说明")
-                .rawResponse(chatResponse.getContent())
-                .model(chatResponse.getModel())
+                .rawResponse(fullContent)
+                .model(request.getModel())
                 .build();
     }
 
@@ -460,30 +485,18 @@ public class AiService {
         }
         userPrompt.append("```\n").append(request.getCode()).append("\n```");
 
-        // 调用AI（不设置maxTokens，使用模型最大容量）
-        AiChatRequest chatRequest = AiChatRequest.builder()
-                .model(request.getModel())
-                .temperature(0.5)
-                .build()
-                .addSystemMessage(systemPrompt.toString())
-                .addUserMessage(userPrompt.toString());
-
-        AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
-
-        if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
-            log.error("AI功能测试失败: {}", chatResponse.getErrorMessage());
-            throw new RuntimeException("AI功能测试失败: " + chatResponse.getErrorMessage());
-        }
+        // 【修复】使用续传机制，避免测试用例被截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt.toString(), 8000, 5);
 
         // 解析测试用例
-        List<TestCase> testCases = parseTestCasesFromContent(chatResponse.getContent());
+        List<TestCase> testCases = parseTestCasesFromContent(fullContent);
 
         // 构建响应（暂不设置success，由重试服务设置）
         return FunctionalTestResponse.builder()
                 .testCases(testCases)
-                .testCode(chatResponse.getContent())
-                .rawResponse(chatResponse.getContent())
-                .model(chatResponse.getModel())
+                .testCode(fullContent)
+                .rawResponse(fullContent)
+                .model(request.getModel())
                 .build();
     }
 
@@ -539,23 +552,11 @@ public class AiService {
         }
         userPrompt.append("```\n").append(request.getCode()).append("\n```");
 
-        // 调用AI（不设置maxTokens，使用模型最大容量）
-        AiChatRequest chatRequest = AiChatRequest.builder()
-                .model(request.getModel())
-                .temperature(0.5)
-                .build()
-                .addSystemMessage(systemPrompt.toString())
-                .addUserMessage(userPrompt.toString());
-
-        AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
-
-        if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
-            log.error("AI安全测试失败: {}", chatResponse.getErrorMessage());
-            throw new RuntimeException("AI安全测试失败: " + chatResponse.getErrorMessage());
-        }
+        // 【修复】使用续传机制，避免安全测试报告被截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt.toString(), 8000, 5);
 
         // 解析漏洞列表
-        List<SecurityVulnerability> vulnerabilities = parseVulnerabilitiesFromContent(chatResponse.getContent());
+        List<SecurityVulnerability> vulnerabilities = parseVulnerabilitiesFromContent(fullContent);
 
         // 统计风险等级
         int highRisk = 0, mediumRisk = 0, lowRisk = 0;
@@ -574,8 +575,8 @@ public class AiService {
                 .highRiskCount(highRisk)
                 .mediumRiskCount(mediumRisk)
                 .lowRiskCount(lowRisk)
-                .rawResponse(chatResponse.getContent())
-                .model(chatResponse.getModel())
+                .rawResponse(fullContent)
+                .model(request.getModel())
                 .build();
     }
 
@@ -697,5 +698,72 @@ public class AiService {
         java.nio.file.Path filePath = docPath.resolve(filename);
         java.nio.file.Files.writeString(filePath, content);
         log.info("测试文档已保存: {}", filePath);
+    }
+
+    /**
+     * 【新增】支持续传的AI调用方法
+     * 当内容被截断时，自动继续生成剩余内容
+     * @param strategy AI策略
+     * @param systemPrompt 系统提示词
+     * @param userPrompt 用户提示词
+     * @param maxTokens 每次调用的最大token数
+     * @param maxContinuation 最大续传次数（防止无限循环）
+     * @return 完整的AI响应内容
+     */
+    private String chatWithContinuation(AIProviderStrategy strategy, String systemPrompt,
+                                        String userPrompt, int maxTokens, int maxContinuation) {
+        StringBuilder fullContent = new StringBuilder();
+        List<AiMessage> messages = new ArrayList<>();
+        messages.add(AiMessage.system(systemPrompt));
+        messages.add(AiMessage.user(userPrompt));
+
+        int continuationCount = 0;
+        boolean isComplete = false;
+
+        while (!isComplete && continuationCount <= maxContinuation) {
+            // 构建请求
+            AiChatRequest chatRequest = AiChatRequest.builder()
+                    .temperature(0.7)
+                    .maxTokens(maxTokens)
+                    .messages(new ArrayList<>(messages))
+                    .build();
+
+            AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
+
+            if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
+                log.error("AI调用失败: {}", chatResponse.getErrorMessage());
+                throw new RuntimeException("AI调用失败: " + chatResponse.getErrorMessage());
+            }
+
+            // 追加生成的内容
+            String content = chatResponse.getContent();
+            if (content != null && !content.isEmpty()) {
+                fullContent.append(content);
+            }
+
+            // 检查是否被截断
+            String finishReason = chatResponse.getFinishReason();
+            log.info("AI调用完成, finishReason: {}, 当前内容长度: {}", finishReason, fullContent.length());
+
+            if ("length".equals(finishReason)) {
+                // 内容被截断，需要续传
+                continuationCount++;
+                log.info("内容被截断，开始第{}次续传", continuationCount);
+
+                // 添加已生成的内容作为assistant消息
+                messages.add(AiMessage.assistant(content));
+                // 添加续传指令
+                messages.add(AiMessage.user("请继续生成剩余内容，从上次中断的地方开始，不要重复已生成的内容。"));
+            } else {
+                // 内容完整，结束循环
+                isComplete = true;
+            }
+        }
+
+        if (continuationCount > maxContinuation) {
+            log.warn("达到最大续传次数{}，内容可能不完整", maxContinuation);
+        }
+
+        return fullContent.toString();
     }
 }

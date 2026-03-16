@@ -49,12 +49,17 @@ Page({
 
       // 如果是AI节点，设置自动触发标记
       if (nextNodeIndex && nextNodeIndex <= 6) {
-        wx.setStorageSync('auto_trigger_ai', {
+        const triggerData = {
           requirementId: requirementId,
           nodeIndex: nextNodeIndex,
           timestamp: Date.now()
-        });
-        console.log(`设置自动触发AI节点: ${nextNodeIndex}`);
+        };
+        wx.setStorageSync('auto_trigger_ai', triggerData);
+        console.log(`【调试】设置自动触发AI节点: ${nextNodeIndex}`, triggerData);
+        
+        // 立即验证是否设置成功
+        const verify = wx.getStorageSync('auto_trigger_ai');
+        console.log('【调试】验证auto_trigger_ai设置结果:', verify);
       }
 
       // 设置标记通知index页面需要刷新

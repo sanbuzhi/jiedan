@@ -25,10 +25,9 @@ public class FeedbackShadowPromptBuilder {
         prompt.append("你是Feedback Shadow系统的核心组件，你的决策将决定文档是否通过检测。\n\n");
 
         prompt.append("【验证原则 - 重要】\n");
-        prompt.append("1. 只验证文档整体质量，不强制要求特定字段\n");
-        prompt.append("2. 只要文档结构清晰、内容合理即可通过\n");
-        prompt.append("3. 不因为缺少特定章节而拒绝，关注整体完整性\n");
-        prompt.append("4. 【放宽标准】轻微问题不拒绝，尽量给出ALLOW或REPAIR\n\n");
+        prompt.append("1. 只要文档结构清晰、内容合理即可通过\n");
+        prompt.append("2. 不因为缺少特定章节而拒绝，关注整体完整性\n");
+        prompt.append("3. 【放宽标准】轻微问题不拒绝\n\n");
 
         prompt.append("【检测维度】\n");
         prompt.append("1. 文档完整性：是否包含必要的章节（概述、主体内容）\n");

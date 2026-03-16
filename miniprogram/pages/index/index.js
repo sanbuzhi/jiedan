@@ -59,11 +59,14 @@ const API_TYPE_MAP = {
 
 // 阶段名称映射
 const STAGE_MAP = {
-  1: 'clarify',
-  3: 'split',
-  4: 'develop',
-  5: 'test',
-  6: 'security'
+  1: 'clarify',    // AI明确需求 → 需求确认验收
+  2: 'clarify',    // 需求确认验收（验收节点，映射到clarify以便正确跳转）
+  3: 'split',      // AI拆分任务
+  4: 'develop',    // AI开发
+  5: 'test',       // AI功能测试
+  6: 'security',   // AI安全测试
+  7: 'security',   // 功能验收测试（验收节点）
+  9: 'final'       // 最终验收（验收节点）
 };
 
 Page({
@@ -166,11 +169,16 @@ Page({
     
     // 检查是否需要刷新（从step/approve页面返回时）
     const needRefresh = wx.getStorageSync('index_need_refresh');
-    const autoTrigger = wx.getStorageSync('auto_trigger_ai');
+    let autoTrigger = wx.getStorageSync('auto_trigger_ai');
     
-    if (needRefresh || autoTrigger) {
+    // 【修复】确保autoTrigger是有效的对象，而不是空字符串
+    const hasAutoTrigger = autoTrigger && autoTrigger !== '' && (typeof autoTrigger !== 'string' || autoTrigger.trim() !== '');
+    
+    console.log('【调试】onShow检查标记:', { needRefresh, autoTrigger, hasAutoTrigger });
+    
+    if (needRefresh || hasAutoTrigger) {
       wx.removeStorageSync('index_need_refresh');
-      console.log('从其他页面返回，刷新需求列表');
+      console.log('【调试】从其他页面返回，准备刷新需求列表和检查自动触发');
       
       // 先刷新需求列表，然后在回调中检查自动触发
       this.loadCurrentRequirementAndCheckAutoTrigger();
@@ -188,13 +196,28 @@ Page({
   
   // 检查是否需要自动触发AI节点
   checkAutoTriggerAI: function () {
-    const autoTrigger = wx.getStorageSync('auto_trigger_ai');
-    if (!autoTrigger) {
-      console.log('没有自动触发标记，跳过');
+    let autoTrigger = wx.getStorageSync('auto_trigger_ai');
+    console.log('【调试】checkAutoTriggerAI检查标记:', autoTrigger);
+    
+    // 【修复】处理空字符串或无效值的情况
+    if (!autoTrigger || autoTrigger === '' || (typeof autoTrigger === 'string' && autoTrigger.trim() === '')) {
+      console.log('【调试】没有自动触发标记，跳过');
       return;
     }
     
-    console.log('检测到自动触发标记:', autoTrigger);
+    // 【修复】如果是字符串，尝试解析为对象
+    if (typeof autoTrigger === 'string') {
+      try {
+        autoTrigger = JSON.parse(autoTrigger);
+        console.log('【调试】解析autoTrigger为对象:', autoTrigger);
+      } catch (e) {
+        console.error('【调试】解析autoTrigger失败:', e);
+        wx.removeStorageSync('auto_trigger_ai');
+        return;
+      }
+    }
+    
+    console.log('【调试】检测到自动触发标记:', autoTrigger);
     
     // 检查是否过期（5分钟内有效）
     const now = Date.now();
@@ -232,9 +255,35 @@ Page({
     // 使用一个特殊的中间状态表示AI正在处理
     const processingNodeIndex = nodeIndex; // AI执行期间保持在当前节点显示处理状态
     
-    // 先获取需求详情
-    requirementApi.getRequirementDetail(requirementId)
+    // 【修复】先从本地获取requirement（包含之前保存的文档），如果没有再从后端获取
+    const localRequirement = this.data.allRequirements.find(r => String(r.id) === String(requirementId));
+    console.log(`【调试】本地requirement查找结果:`, {
+      requirementId,
+      found: !!localRequirement,
+      hasRequirementDoc: !!(localRequirement && localRequirement.requirementDoc),
+      hasTaskDoc: !!(localRequirement && localRequirement.taskDoc)
+    });
+    
+    // 先获取需求详情（优先使用本地数据，本地没有则从后端获取）
+    const requirementPromise = localRequirement 
+      ? Promise.resolve(localRequirement)
+      : requirementApi.getRequirementDetail(requirementId);
+    
+    requirementPromise
       .then(requirement => {
+        // 【修复】合并本地保存的文档数据（后端返回的数据可能不包含这些字段）
+        if (localRequirement) {
+          if (localRequirement.requirementDoc && !requirement.requirementDoc) {
+            requirement.requirementDoc = localRequirement.requirementDoc;
+          }
+          if (localRequirement.taskDoc && !requirement.taskDoc) {
+            requirement.taskDoc = localRequirement.taskDoc;
+          }
+          if (localRequirement.generatedCode && !requirement.generatedCode) {
+            requirement.generatedCode = localRequirement.generatedCode;
+          }
+        }
+        
         // 构建请求数据
         let requestData = this.buildAIRequestData(nodeIndex, requirement);
 
@@ -305,19 +354,25 @@ Page({
 
   // 【新增】保存AI生成的文档内容到requirement对象，供后续节点使用
   saveAIDocumentToRequirement: function (requirementId, nodeIndex, result) {
-    // 【修复】使用正确的字段名 allRequirements
-    const requirement = this.data.allRequirements.find(r => r.id === requirementId);
-    if (!requirement) {
-      console.warn(`未找到requirement对象, requirementId: ${requirementId}`);
+    // 【修复】使用正确的字段名 allRequirements，并处理id类型不匹配问题
+    const reqIdStr = String(requirementId);
+    const requirements = [...this.data.allRequirements];
+    const requirementIndex = requirements.findIndex(r => String(r.id) === reqIdStr);
+    if (requirementIndex === -1) {
+      console.warn(`【调试】未找到requirement对象, requirementId: ${requirementId}, allRequirements:`, this.data.allRequirements.map(r => r.id));
       return;
     }
+
+    const requirement = requirements[requirementIndex];
 
     // 处理不同节点的返回数据
     switch (nodeIndex) {
       case 1: // AI明确需求
         if (result.documentContent) {
           requirement.requirementDoc = result.documentContent;
-          console.log(`已保存需求文档到requirement对象, requirementId: ${requirementId}`);
+          console.log(`【调试】已保存需求文档到requirement对象, requirementId: ${requirementId}, 文档长度: ${result.documentContent.length}`);
+        } else {
+          console.warn(`【调试】AI明确需求返回的documentContent为空, requirementId: ${requirementId}, result:`, result);
         }
         break;
       case 3: // AI拆分任务
@@ -345,6 +400,12 @@ Page({
         }
         break;
     }
+
+    // 【修复】更新allRequirements数组到data中，确保后续节点能读取到保存的文档
+    this.setData({
+      allRequirements: requirements
+    });
+    console.log(`【调试】已更新allRequirements数组, requirementId: ${requirementId}, hasRequirementDoc: ${!!requirement.requirementDoc}, hasTaskDoc: ${!!requirement.taskDoc}`);
   },
 
   // 构建AI请求数据
@@ -360,10 +421,16 @@ Page({
         requestData.projectId = requirement.id ? String(requirement.id) : '';
         // 【修复】使用AI明确需求生成的文档内容
         requestData.requirementDoc = requirement.requirementDoc || '暂无需求文档';
+        console.log('【调试】AI拆分任务请求数据:', {
+          requirementId: requirement.id,
+          hasRequirementDoc: !!requirement.requirementDoc,
+          docLength: requirement.requirementDoc ? requirement.requirementDoc.length : 0
+        });
         break;
       case 4: // AI开发
         requestData.projectId = requirement.id ? String(requirement.id) : '';
-        requestData.taskDescription = '基于需求生成项目代码';
+        // 【修复】使用AI拆分任务生成的任务文档
+        requestData.taskDescription = requirement.taskDoc || '基于需求生成项目代码';
         requestData.language = 'java';
         requestData.framework = 'springboot';
         break;
