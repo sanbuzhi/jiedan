@@ -1,13 +1,9 @@
 com\jiedan\ai\HuoshanApiDemoTest.class
 com\jiedan\service\ai\ChatContinuationIntegrationTest.class
 com\jiedan\service\ai\ChatContinuationRealTest.class
-com\jiedan\ai\AiServiceIntegrationTest.class
-com\jiedan\controller\AiControllerIntegrationTest.class
 com\jiedan\util\FlowNodeCalculatorTest.class
 com\jiedan\controller\HealthControllerTest.class
-com\jiedan\ai\AiServiceManualTest.class
 com\jiedan\service\ai\ChatContinuationManualTest.class
 com\jiedan\util\ReferralCodeGeneratorTest.class
-com\jiedan\service\ai\AiServiceTest.class
 com\jiedan\service\ai\ChatContinuationSimpleTest.class
 com\jiedan\util\BudgetCalculatorTest.class

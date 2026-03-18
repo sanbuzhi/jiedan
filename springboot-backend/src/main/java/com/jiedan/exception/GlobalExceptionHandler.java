@@ -63,12 +63,14 @@ public class GlobalExceptionHandler {
     private String getStackTraceString(Exception e) {
         StringBuilder sb = new StringBuilder();
         sb.append(e.toString()).append("\n");
+        int count = 0;
         for (StackTraceElement element : e.getStackTrace()) {
-            sb.append("\tat ").append(element.toString()).append("\n");
-            if (sb.length() > 2000) {
+            if (count >= 5) {
                 sb.append("... (truncated)");
                 break;
             }
+            sb.append("\tat ").append(element.toString()).append("\n");
+            count++;
         }
         return sb.toString();
     }

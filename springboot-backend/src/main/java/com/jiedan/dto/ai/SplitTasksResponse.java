@@ -20,6 +20,16 @@ import java.util.List;
 public class SplitTasksResponse implements AiRetryService.AiResult {
 
     /**
+     * 版本ID（如 V1-1）
+     */
+    private String versionId;
+
+    /**
+     * 重试次数
+     */
+    private int retryCount;
+
+    /**
      * 是否成功（Feedback Shadow验证通过）
      */
     private boolean success;
@@ -44,6 +54,21 @@ public class SplitTasksResponse implements AiRetryService.AiResult {
      * 【简化】直接返回完整的Markdown文档，不解析具体字段
      */
     private String documentContent;
+
+    /**
+     * 选中的版本号（并行执行后决策结果）
+     */
+    private String selectedVersion;
+
+    /**
+     * 决策理由（并行执行后决策结果）
+     */
+    private String decisionReason;
+
+    /**
+     * 改进建议列表（并行执行后决策结果）
+     */
+    private List<String> improvements;
 
     /**
      * 获取原始响应（用于Feedback Shadow验证）

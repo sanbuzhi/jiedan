@@ -21,13 +21,13 @@ const FLOW_NODES = [
 
 // AI节点配置（使用0-based数组索引）
 // needsApproval: true=执行完后等待客户验收, false=自动继续下一个AI节点
-// timeout: 10分钟 = 600000毫秒
+// timeout: 40分钟 = 2400000毫秒
 const AI_NODE_CONFIG = {
-  1: { name: 'AI明确需求', api: 'clarifyRequirement', nextNode: 2, maxRetries: 3, timeout: 600000, needsApproval: true },   // → 节点2(需求确认验收)需要人工验收
-  3: { name: 'AI拆分任务', api: 'splitTasks', nextNode: 4, maxRetries: 3, timeout: 600000, needsApproval: false },             // → 节点4(AI开发)自动继续
-  4: { name: 'AI开发', api: 'generateCode', nextNode: 5, maxRetries: 3, timeout: 600000, needsApproval: false },              // → 节点5(AI功能测试)自动继续
-  5: { name: 'AI功能测试', api: 'functionalTest', nextNode: 6, maxRetries: 3, timeout: 600000, needsApproval: false },          // → 节点6(AI安全测试)自动继续
-  6: { name: 'AI安全测试', api: 'securityTest', nextNode: 7, maxRetries: 3, timeout: 600000, needsApproval: true }             // → 节点7(功能验收测试)需要人工验收
+  1: { name: 'AI明确需求', api: 'clarifyRequirement', nextNode: 2, maxRetries: 0, timeout: 2400000, needsApproval: true },   // → 节点2(需求确认验收)需要人工验收
+  3: { name: 'AI拆分任务', api: 'splitTasks', nextNode: 4, maxRetries: 0, timeout: 2400000, needsApproval: false },             // → 节点4(AI开发)自动继续
+  4: { name: 'AI开发', api: 'generateCode', nextNode: 5, maxRetries: 0, timeout: 2400000, needsApproval: false },              // → 节点5(AI功能测试)自动继续
+  5: { name: 'AI功能测试', api: 'functionalTest', nextNode: 6, maxRetries: 0, timeout: 2400000, needsApproval: false },          // → 节点6(AI安全测试)自动继续
+  6: { name: 'AI安全测试', api: 'securityTest', nextNode: 7, maxRetries: 0, timeout: 2400000, needsApproval: true }             // → 节点7(功能验收测试)需要人工验收
 };
 
 // 点击提示配置
@@ -328,24 +328,18 @@ Page({
       .catch(err => {
         console.error(`${aiNode.name}失败:`, err);
 
-        // 检查是否需要重试
-        if (retryCount < aiNode.maxRetries) {
-          console.log(`${aiNode.name}将在3秒后重试 (${retryCount + 1}/${aiNode.maxRetries})`);
-          setTimeout(() => {
-            this.executeAINodeWithRetry(requirementId, nodeIndex, retryCount + 1);
-          }, 3000);
-        } else {
-          console.error(`${aiNode.name}已达到最大重试次数，停止自动执行`);
-          // 标记节点为失败状态
-          this.markNodeAsFailed(requirementId, nodeIndex);
-          
-          // 通知用户AI处理失败
-          wx.showToast({
-            title: `${aiNode.name}失败，请重试`,
-            icon: 'none',
-            duration: 3000
-          });
-        }
+        // 【改造】移除前端重试机制，后端已改为并行执行
+        // 直接标记失败并通知用户
+        console.error(`${aiNode.name}执行失败，后端将采用并行策略重试`);
+        // 标记节点为失败状态
+        this.markNodeAsFailed(requirementId, nodeIndex);
+        
+        // 通知用户AI处理失败
+        wx.showToast({
+          title: `${aiNode.name}失败，请重试`,
+          icon: 'none',
+          duration: 3000
+        });
       });
   },
 
@@ -419,33 +413,50 @@ Page({
         break;
       case 3: // AI拆分任务
         requestData.projectId = requirement.id ? String(requirement.id) : '';
-        // 【修复】使用AI明确需求生成的文档内容
-        requestData.requirementDoc = requirement.requirementDoc || '暂无需求文档';
+        // 【修改】不再传递requirementDoc，后端自动从数据库查询
         console.log('【调试】AI拆分任务请求数据:', {
           requirementId: requirement.id,
-          hasRequirementDoc: !!requirement.requirementDoc,
-          docLength: requirement.requirementDoc ? requirement.requirementDoc.length : 0
+          requirementDoc: '从数据库查询'
         });
         break;
       case 4: // AI开发
         requestData.projectId = requirement.id ? String(requirement.id) : '';
-        // 【修复】使用AI拆分任务生成的任务文档
-        requestData.taskDescription = requirement.taskDoc || '基于需求生成项目代码';
-        requestData.language = 'java';
-        requestData.framework = 'springboot';
+        // 【修改】不再传递requirementDoc和taskDoc，后端自动从数据库查询
+        console.log('【调试】AI开发请求数据:', {
+          requirementId: requirement.id,
+          requirementDoc: '从数据库查询',
+          taskDoc: '从数据库查询'
+        });
+        
+        // 【步骤1】添加模块化参数支持（可选，用于大型项目）
+        if (requirement.moduleName) {
+          requestData.moduleName = requirement.moduleName;
+          requestData.fileList = requirement.fileList || [];
+          requestData.moduleOrder = requirement.moduleOrder || 1;
+          requestData.isLastModule = requirement.isLastModule || false;
+          requestData.generatedModulesSummary = requirement.generatedModulesSummary || {};
+        }
+        
+        // 可选：从任务书推断技术栈
+        console.log('【调试】AI开发请求数据:', {
+          requirementId: requirement.id,
+          hasRequirementDoc: !!requirement.requirementDoc,
+          hasTaskDoc: !!requirement.taskDoc,
+          requirementDocLength: requirement.requirementDoc ? requirement.requirementDoc.length : 0,
+          taskDocLength: requirement.taskDoc ? requirement.taskDoc.length : 0,
+          moduleName: requirement.moduleName || '未指定（完整生成）'
+        });
         break;
       case 5: // AI功能测试
         requestData.projectId = requirement.id ? String(requirement.id) : null;
         // 【注意】需要从节点4获取生成的代码，暂时使用占位符
         requestData.code = requirement.generatedCode || '// 待测试代码，请先生成代码';
-        requestData.language = 'java';
         requestData.functionDescription = requirement.requirementDescription || '暂无描述';
         break;
       case 6: // AI安全测试
         requestData.projectId = requirement.id ? String(requirement.id) : null;
         // 【注意】需要从节点4获取生成的代码，暂时使用占位符
         requestData.code = requirement.generatedCode || '// 待测试代码，请先生成代码';
-        requestData.language = 'java';
         requestData.applicationType = 'web';
         break;
     }

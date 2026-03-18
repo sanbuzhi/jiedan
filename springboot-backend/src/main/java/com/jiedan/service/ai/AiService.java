@@ -4,11 +4,15 @@ import com.jiedan.dto.ai.*;
 import com.jiedan.dto.ai.feedback.FeedbackShadowValidateRequest;
 import com.jiedan.dto.ai.feedback.FeedbackShadowValidateResponse;
 import com.jiedan.dto.ai.feedback.ValidationDecision;
+import com.jiedan.entity.Requirement;
+import com.jiedan.repository.RequirementRepository;
 import com.jiedan.service.ai.code.GitVersionControlService;
 import com.jiedan.service.ai.feedback.FeedbackShadowService;
+import com.jiedan.service.ai.prompt.AiPromptTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,6 +36,11 @@ public class AiService {
     private final GitVersionControlService gitVersionControlService;
     private final FeedbackShadowService feedbackShadowService;
     private final AiRetryService aiRetryService;
+    private final CodeValidator codeValidator;
+    private final TaskDecisionService taskDecisionService;
+    private final VersionCollector versionCollector;
+    private final SessionManager sessionManager;
+    private final RequirementRepository requirementRepository;
 
     // 文档版本计数器：projectId -> apiType -> version
     private final Map<String, Map<String, Integer>> documentVersionCounter = new ConcurrentHashMap<>();
@@ -75,11 +84,14 @@ public class AiService {
                 "clarify-requirement"
         );
 
-        // 最终放行后保存最终交付版到req目录
+        // 最终放行后保存最终交付版到数据库和文件
         if (response.isSuccess() && response.getDocumentContent() != null) {
             try {
+                // 保存到文件
                 saveFinalDocument(request.getProjectId(), "clarify-requirement", response.getDocumentContent());
-                log.info("需求文档最终版已保存到req目录, projectId: {}", request.getProjectId());
+                // 保存到数据库
+                saveRequirementDocToDatabase(request.getProjectId(), response.getDocumentContent());
+                log.info("需求文档最终版已保存到数据库和文件, projectId: {}", request.getProjectId());
             } catch (Exception e) {
                 log.error("保存需求文档最终版失败, projectId: {}", request.getProjectId(), e);
             }
@@ -90,7 +102,7 @@ public class AiService {
 
     /**
      * 单次执行AI明确需求
-     * 【简化】直接生成Markdown文档，不解析具体字段
+     * 【规范化】使用标准化的Prompt模板
      * @param previousIssues 之前验证的问题列表（重试时携带）
      */
     private ClarifyRequirementResponse executeClarifyRequirementOnce(ClarifyRequirementRequest request,
@@ -98,21 +110,8 @@ public class AiService {
         // 使用默认策略（传入null获取默认策略）
         AIProviderStrategy strategy = strategyFactory.getStrategy(null);
 
-        // 【简化】直接要求生成Markdown文档
-        StringBuilder systemPrompt = new StringBuilder("""
-                你是拥有10年软件行业经验的资深需求分析师。请根据用户需求，生成一份完整的需求文档。
-                请确保用户需求无遗漏，以及以下要求均满足，再交付。
-
-                要求：
-                1. 使用Markdown格式
-                2. 包含以下内容：
-                   - 需求概述
-                   - 系统用户角色（角色名、定位、职责、权限范围）
-                   - 功能模块清单（按系统用户角色分组，每个角色下含「模块→子模块→功能」）
-                3. 文档要详细、完整、可实施
-                4. 直接输出Markdown文档，不需要JSON格式
-                5. 【重要】必须生成完整的文档，不能截断，确保所有模块都描述完整
-                """);
+        // 【规范化】使用标准化的System Prompt
+        StringBuilder systemPrompt = new StringBuilder(AiPromptTemplate.CLARIFY_REQUIREMENT_SYSTEM);
 
         // 【重试时】携带之前的反馈建议
         if (previousIssues != null && !previousIssues.isEmpty()) {
@@ -123,8 +122,8 @@ public class AiService {
             systemPrompt.append("\n请根据以上问题重新生成完整的需求文档，确保所有问题都已解决。");
         }
 
-        // 【简化】只使用需求描述
-        String userPrompt = "用户需求：" + request.getRequirementDescription();
+        // 【规范化】使用标准化的User Prompt
+        String userPrompt = AiPromptTemplate.buildClarifyRequirementUserPrompt(request.getRequirementDescription());
 
         // 【修复】使用续传机制，避免文档被截断
         String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt, 8000, 5);
@@ -137,52 +136,152 @@ public class AiService {
 
     /**
      * AI拆分任务
-     * 生成任务拆分文档并保存到项目目录，自动提交Git
-     * 【启用重试机制】携带Feedback Shadow反馈建议进行重试
-     * 【文档保存】每次执行保存一版，最终放行后保存最终交付版到task目录
+     * 【改造】改为并行执行策略，同时执行3个任务，选择最佳结果
+     * 【解决循环依赖】直接实例化AiParallelExecutor，不通过Spring注入
      */
     public SplitTasksResponse splitTasks(SplitTasksRequest request) {
-        log.info("开始AI拆分任务（带重试）, projectId: {}", request.getProjectId());
+        log.info("开始AI拆分任务（并行执行+真正多轮会话）, projectId: {}", request.getProjectId());
 
-        // 初始化版本计数器
-        documentVersionCounter.putIfAbsent(request.getProjectId(), new ConcurrentHashMap<>());
-        Map<String, Integer> apiVersions = documentVersionCounter.get(request.getProjectId());
+        // 获取需求文档：从数据库查询
+        String requirementDoc = getRequirementDocFromDatabase(request.getProjectId());
+        if (requirementDoc == null) {
+            log.error("无法获取需求文档, projectId: {}", request.getProjectId());
+            return SplitTasksResponse.builder()
+                    .success(false)
+                    .errorMessage("无法获取需求文档，请先明确需求")
+                    .build();
+        }
+        
+        // 构建提示词
+        String systemPrompt = AiPromptTemplate.SPLIT_TASKS_SYSTEM;
+        String userPrompt = "需求文档：\n\n" + requirementDoc;
 
-        // 使用重试服务执行AI任务
-        SplitTasksResponse response = aiRetryService.executeWithRetry(
-                (previousIssues) -> {
-                    // 执行AI任务
-                    SplitTasksResponse result = executeSplitTasksOnce(request, previousIssues);
-
-                    // 每次执行成功都保存一版文档（放到feedback目录）
-                    if (result.getDocumentContent() != null) {
-                        int version = apiVersions.getOrDefault("split-tasks", 0) + 1;
-                        apiVersions.put("split-tasks", version);
-                        try {
-                            saveDocumentVersion(request.getProjectId(), "split-tasks",
-                                    result.getDocumentContent(), version, false);
-                        } catch (Exception e) {
-                            log.error("保存任务文档版本失败, projectId: {}, version: {}", request.getProjectId(), version, e);
-                        }
-                    }
-
-                    return result;
-                },
-                request.getProjectId(),
-                "split-tasks"
+        // 【解决循环依赖】直接实例化并行执行器，传入回调函数
+        // 【真正多轮会话】使用sessionManager和strategyFactory
+        AiParallelExecutor parallelExecutor = new AiParallelExecutor(
+                taskDecisionService,
+                versionCollector,
+                feedbackShadowService,
+                aiRetryService,
+                sessionManager,
+                strategyFactory,
+                // 回调函数：执行单次AI任务（真正多轮会话模式）
+                // 参数：(messages, previousIssues) -> SplitTasksResponse
+                (taskRequest, versionId, previousContent, previousIssues) -> {
+                    // 解析versionId获取taskIndex和retryCount
+                    String[] parts = versionId.split("-");
+                    int taskIndex = Integer.parseInt(parts[0].replace("V", ""));
+                    int retryCount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                    
+                    // 调用AiService的内部方法
+                    return executeSplitTasksOnceInternal(taskRequest, systemPrompt, taskIndex, retryCount);
+                }
         );
 
-        // 最终放行后保存最终交付版到task目录
-        if (response.isSuccess() && response.getDocumentContent() != null) {
+        // 使用并行执行器执行
+        AiParallelExecutor.ParallelResult result = parallelExecutor.executeSplitTasksParallel(
+                request, systemPrompt, userPrompt);
+
+        // 关闭执行器
+        parallelExecutor.shutdown();
+
+        if (!result.success()) {
+            log.error("并行执行AI拆分任务失败, projectId: {}", request.getProjectId());
+            return SplitTasksResponse.builder()
+                    .success(false)
+                    .errorMessage("AI拆分任务执行失败")
+                    .build();
+        }
+
+        // 保存最终文档
+        if (result.content() != null) {
             try {
-                saveFinalDocument(request.getProjectId(), "split-tasks", response.getDocumentContent());
-                log.info("任务文档最终版已保存到task目录, projectId: {}", request.getProjectId());
+                // 保存到文件
+                saveFinalDocument(request.getProjectId(), "split-tasks", result.content());
+                // 保存到数据库
+                saveTaskDocToDatabase(request.getProjectId(), result.content());
+                log.info("任务文档最终版已保存到task目录和数据库, projectId: {}, 选中版本: {}, 理由: {}",
+                        request.getProjectId(), result.selectedVersion(), result.decisionReason());
             } catch (Exception e) {
                 log.error("保存任务文档最终版失败, projectId: {}", request.getProjectId(), e);
             }
         }
 
-        return response;
+        return SplitTasksResponse.builder()
+                .success(true)
+                .documentContent(result.content())
+                .selectedVersion(result.selectedVersion())
+                .decisionReason(result.decisionReason())
+                .improvements(result.improvements())
+                .build();
+    }
+
+    /**
+     * 【内部方法】供并行执行器调用，执行单次AI拆分任务
+     * 【注意】此方法当前未被使用，由executeWithRetryAndSession替代
+     * 保留此方法仅用于兼容性和备用
+     * @param taskIndex 任务索引（1-3）
+     * @param retryCount 重试次数（1-3）
+     */
+    @Deprecated
+    public SplitTasksResponse executeSplitTasksOnceInternal(SplitTasksRequest request,
+                                                            String systemPrompt,
+                                                            int taskIndex,
+                                                            int retryCount) {
+        String versionId = "V" + taskIndex + "-" + retryCount;
+        log.info("执行单次AI拆分任务内部方法（已废弃）, projectId: {}, versionId: {}",
+                request.getProjectId(), versionId);
+
+        // 使用默认策略
+        AIProviderStrategy strategy = strategyFactory.getStrategy(null);
+
+        // 构建用户提示词
+        String userPrompt = "需求文档：\n\n" + request.getRequirementDoc();
+
+        // 使用续传机制确保内容完整，不截断
+        String fullContent = chatWithContinuation(strategy, systemPrompt, userPrompt, 16000, 5);
+
+        // 保存版本到feedback目录
+        try {
+            saveDocumentVersionWithVersionId(request.getProjectId(), "split-tasks",
+                    fullContent, versionId, false);
+            log.info("任务版本 {} 已保存, projectId: {}, 内容长度: {}",
+                    versionId, request.getProjectId(), fullContent.length());
+        } catch (Exception e) {
+            log.error("保存任务版本失败, projectId: {}, versionId: {}",
+                    request.getProjectId(), versionId, e);
+        }
+
+        return SplitTasksResponse.builder()
+                .documentContent(fullContent)
+                .build();
+    }
+
+    /**
+     * 【新增】使用版本ID保存文档版本
+     * @param versionId 版本ID，如 V1-1, V1-2, V2-1
+     */
+    private void saveDocumentVersionWithVersionId(String projectId, String apiType,
+                                                   String content, String versionId,
+                                                   boolean isFinal) throws java.io.IOException {
+        String projectPath = "projects/" + projectId;
+        String feedbackDir = projectPath + "/feedback/" + apiType;
+
+        // 确保目录存在
+        java.nio.file.Path dirPath = java.nio.file.Paths.get(feedbackDir);
+        if (!java.nio.file.Files.exists(dirPath)) {
+            java.nio.file.Files.createDirectories(dirPath);
+        }
+
+        // 生成文件名: {versionId}-{timestamp}-{random}.md
+        String timestamp = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String random = java.util.UUID.randomUUID().toString().substring(0, 8);
+        String fileName = versionId + "-" + timestamp + "-" + random + ".md";
+
+        java.nio.file.Path filePath = dirPath.resolve(fileName);
+        java.nio.file.Files.writeString(filePath, content);
+        log.info("文档版本已保存: {}, versionId: {}, final: {}", filePath, versionId, isFinal);
     }
 
     /**
@@ -194,80 +293,8 @@ public class AiService {
         // 使用默认策略（传入null获取默认策略）
         AIProviderStrategy strategy = strategyFactory.getStrategy(null);
 
-        // 【优化】生成AI自动开发可用的详细技术任务书
-        StringBuilder systemPrompt = new StringBuilder("""
-                你是一位20年资历的AI技术架构师，需生成供AI代码生成接口直接执行使用的详细技术任务书。
-
-                【任务书要求】
-                使用Markdown格式
-                
-                ## 核心输出要求
-                1. 格式：纯Markdown，无解释性备注、无重复内容、无未完成截断内容；
-                2. 粒度：所有指令需可直接映射为代码逻辑，每章节内容仅保留AI生成代码必需的核心信息；
-                3. 完整性：覆盖全流程可运行代码生成所需的技术规格、接口、数据库、业务规则，不截断；
-                4. 适配性：按AI单次生成能力拆分逻辑（但文档结构完整），避免冗余token占用。
-                
-                ## 任务书必须包含的章节（仅保留以下核心内容）
-
-                ### 1. 项目技术规格
-                - 技术栈确定：明确版本号（前端：微信小程序/VUE/html+css+js；后端：Spring Boot+MyBatis/Node.js；数据库：MySQL；接口：RESTful API、UTF-8）；
-                - 项目结构规范：仅保留前端/后端核心代码目录（删test目录、废弃目录、非核心配置文件）；
-                - 代码生成规则：仅保留可落地的约束（依赖版本固定、输入双重校验、敏感信息放配置、接口统一Result返回、JWT登录校验）。
-
-                ### 2. 前端页面开发清单
-                按模块（首页/商品/购物车/订单/用户）列出页面，每个页面仅包含：
-                - 页面名称+路径（如pages/index/index）；
-                - 核心功能描述（无冗余修饰）；
-                - 必用组件（仅列实际代码引用的组件名）；
-                - 接口调用清单（URL+请求方式）；
-                - 页面跳转关系（仅列核心跳转路径+参数）。
-                
-                ### 3. 后端接口开发清单
-                按模块（首页/商品/购物车/订单/用户）列出接口，每个接口仅包含：
-                - 接口URL+请求方式（如GET /api/v1/banners）；
-                - 请求参数（字段名+类型+是否必填+校验规则）；
-                - 响应数据格式（字段名+类型+统一Result包装）；
-                - 核心业务逻辑（仅保留代码可实现的逻辑，无冗余描述）；
-                - 关联数据库表名。
-                
-                ### 4. 数据库表结构设计
-                按业务模块设计表，每个表仅包含：
-                - 表名+核心用途；
-                - 字段定义（字段名+数据类型+约束+默认值+注释）；
-                - 主键/外键/索引（仅核心索引）；
-                - 表间关联关系（简洁描述）。
-                
-                ### 5. 业务逻辑规则
-                仅保留可代码化的核心规则：
-                - 核心业务流程（如“登录→加购→下单→支付→自提”）；
-                - 数据校验规则（前端表单+后端参数校验的具体规则）；
-                - 状态流转规则（订单状态：待付款/待自提/已完成的触发条件）；
-                - 异常处理规则（接口异常、登录失效、参数错误的返回逻辑）。
-                
-                ### 6. 开发执行顺序
-                按依赖优先级拆分，仅列核心阶段：
-                - 阶段1：数据库表创建（按依赖顺序）；
-                - 阶段2：后端接口开发（按“基础通用→首页→商品→购物车→订单→用户”）；
-                - 阶段3：前端页面开发（同接口依赖顺序）；
-                - 阶段4：接口联调（核心联调规则）。
-                
-                ### 7. 代码生成规范
-                仅保留可落地的命名/结构/注释规则：
-                - 命名规范：类名（大驼峰）、方法名（小驼峰）、变量名（小驼峰）、表名（下划线+小写）、字段名（下划线+小写）；
-                - 代码结构：前端请求封装/存储封装规范、后端Controller/Service/Mapper分层规范；
-                - 注释要求：接口/核心方法必须加注释（参数/返回值/业务说明）；
-                - 错误码定义：统一错误码枚举（如SUCCESS=200、LOGIN_EXPIRE=401、PARAM_ERROR=400）。
-                
-                ## 禁止项
-                1. 不添加解释性备注（如“供AI测试验证”“增强体验”等）；
-                2. 不重复描述规则（如“可运行代码”仅提1次）；
-                3. 不包含非核心目录/文件（如test、README.md、废弃目录）；
-                4. 不出现未完成截断内容；
-                5. 不使用冗余修饰词，所有描述需直接指向代码实现。
-                
-                ## 输出要求
-                直接输出完整Markdown任务书，无前置说明、无JSON格式、无截断，确保AI可直接按文档分模块生成100%可运行代码。
-                """);
+        // 【规范化】使用标准化的System Prompt
+        StringBuilder systemPrompt = new StringBuilder(AiPromptTemplate.SPLIT_TASKS_SYSTEM);
 
         // 【重试时】携带之前的反馈建议
         if (previousIssues != null && !previousIssues.isEmpty()) {
@@ -278,11 +305,11 @@ public class AiService {
             systemPrompt.append("\n请根据以上问题重新生成完整的任务拆分，确保所有问题都已解决。");
         }
 
-        // 【简化】直接使用需求文档内容
-        String userPrompt = "需求文档：\n" + request.getRequirementDoc();
+        // 【优化】明确指定项目类型，强调基于需求文档生成
+        String userPrompt = "需求文档：\n\n" + request.getRequirementDoc();
 
         // 【修复】使用续传机制，避免文档被截断
-        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt, 8000, 5);
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt, 16000, 5);
 
         // 【简化】直接返回文档内容
         return SplitTasksResponse.builder()
@@ -322,6 +349,14 @@ public class AiService {
     private void saveFinalDocument(String projectId, String apiType, String content) throws java.io.IOException {
         String projectPath = "projects/" + projectId;
 
+        // 【修改】generate-code类型已经在parseAndSaveCodeFiles中保存为代码文件，这里只保存到feedback目录
+        if ("generate-code".equals(apiType)) {
+            // 只保存到feedback目录作为备份
+            saveDocumentVersion(projectId, apiType, content, 0, true);
+            log.info("代码内容已保存到feedback目录作为备份, projectId: {}", projectId);
+            return;
+        }
+
         // 确定目标目录和文件名
         String targetDir;
         String fileName;
@@ -334,10 +369,6 @@ public class AiService {
             case "split-tasks":
                 targetDir = "task";
                 fileName = "TASKS.md";
-                break;
-            case "generate-code":
-                targetDir = "code";
-                fileName = "CODE.md";
                 break;
             case "functional-test":
                 targetDir = "code/tests";
@@ -366,36 +397,132 @@ public class AiService {
     /**
      * AI生成代码
      * 【启用重试机制】携带Feedback Shadow反馈建议进行重试
+     * 【文档保存】每次执行保存一版，最终放行后保存最终交付版到code目录
+     * 【优化】支持模块化生成，每个模块32k token，避免超长上下文
      */
     public GenerateCodeResponse generateCode(GenerateCodeRequest request) {
-        log.info("开始AI生成代码（带重试）, 任务: {}", request.getTaskDescription());
+        String moduleInfo = request.getModuleName() != null ? 
+                "模块[" + request.getModuleName() + "]" : "完整项目";
+        log.info("开始AI生成代码（带重试）, projectId: {}, {}", request.getProjectId(), moduleInfo);
+
+        // 获取需求文档：从数据库查询
+        String requirementDoc = getRequirementDocFromDatabase(request.getProjectId());
+        if (requirementDoc == null) {
+            log.error("无法获取需求文档, projectId: {}", request.getProjectId());
+            return GenerateCodeResponse.builder()
+                    .success(false)
+                    .errorMessage("无法获取需求文档！")
+                    .build();
+        } else
+            request.setRequirementDoc(requirementDoc);
+
+        // 获取任务文档：从数据库查询
+        String taskDoc = getTaskDocFromDatabase(request.getProjectId());
+        if (taskDoc == null) {
+            log.error("无法获取任务书文档, projectId: {}", request.getProjectId());
+            return GenerateCodeResponse.builder()
+                    .success(false)
+                    .errorMessage("无法获取任务书文档！")
+                    .build();
+        }
+        request.setTaskDoc(taskDoc);
+
+        // 初始化版本计数器
+        documentVersionCounter.putIfAbsent(request.getProjectId(), new ConcurrentHashMap<>());
+        Map<String, Integer> apiVersions = documentVersionCounter.get(request.getProjectId());
+
+        // 构建API类型（区分不同模块）
+        String apiType = request.getModuleName() != null ? 
+                "generate-code-" + request.getModuleName() : "generate-code";
 
         // 使用重试服务执行AI任务
-        return aiRetryService.executeWithRetry(
-                (previousIssues) -> executeGenerateCodeOnce(request, previousIssues),
+        GenerateCodeResponse response = aiRetryService.executeWithRetry(
+                (previousIssues) -> {
+                    // 执行AI任务
+                    GenerateCodeResponse result = executeGenerateCodeOnce(request, previousIssues);
+
+                    // 每次执行成功都保存一版代码（放到feedback目录）
+                    if (result.getCode() != null) {
+                        int version = apiVersions.getOrDefault(apiType, 0) + 1;
+                        apiVersions.put(apiType, version);
+                        try {
+                            saveDocumentVersion(request.getProjectId(), apiType,
+                                    result.getCode(), version, false);
+                        } catch (Exception e) {
+                            log.error("保存代码版本失败, projectId: {}, module: {}, version: {}", 
+                                    request.getProjectId(), request.getModuleName(), version, e);
+                        }
+                    }
+
+                    return result;
+                },
                 request.getProjectId(),
-                "generate-code"
+                apiType
         );
+
+        // 保存代码文件到code目录
+        if (response.isSuccess() && response.getCode() != null) {
+            try {
+                // 解析并保存代码文件
+                Map<String, String> savedFiles = parseAndSaveCodeFilesWithResult(request.getProjectId(), response.getCode());
+                
+                // 【步骤3】代码验证
+                if (codeValidator != null && !savedFiles.isEmpty()) {
+                    CodeValidator.ValidationResult validationResult = codeValidator.validateProject(savedFiles);
+                    log.info("代码验证完成, projectId: {}, 得分: {}, 错误: {}, 警告: {}",
+                            request.getProjectId(), validationResult.getScore(),
+                            validationResult.getErrors().size(), validationResult.getWarnings().size());
+                    
+                    // 将验证结果关联到响应
+                    response.setValidationDecision(validationResult.isValid() ? "PASSED" : "FAILED");
+                    
+                    if (!validationResult.getErrors().isEmpty()) {
+                        response.setErrorMessage(String.join("; ", validationResult.getErrors()));
+                    }
+                    
+                    // 如果验证不通过，记录警告
+                    if (!validationResult.isValid()) {
+                        log.warn("代码验证发现错误, projectId: {}", request.getProjectId());
+                        for (String error : validationResult.getErrors()) {
+                            log.warn("  错误: {}", error);
+                        }
+                    }
+                    for (String warning : validationResult.getWarnings()) {
+                        log.warn("  警告: {}", warning);
+                    }
+                }
+                
+                // 如果是模块化生成，记录模块摘要
+                if (request.getModuleName() != null) {
+                    log.info("模块[{}]代码已保存到code目录, projectId: {}", 
+                            request.getModuleName(), request.getProjectId());
+                } else {
+                    // 保存到feedback目录作为备份
+                    saveFinalDocument(request.getProjectId(), "generate-code", response.getCode());
+                    log.info("代码最终版已保存, projectId: {}", request.getProjectId());
+                }
+            } catch (Exception e) {
+                log.error("保存代码失败, projectId: {}, module: {}", 
+                        request.getProjectId(), request.getModuleName(), e);
+            }
+        }
+
+        return response;
     }
 
     /**
      * 单次执行AI生成代码
+     * 【重构】基于需求书和任务书生成完整项目代码
      * @param previousIssues 之前验证的问题列表（重试时携带）
      */
     private GenerateCodeResponse executeGenerateCodeOnce(GenerateCodeRequest request, List<String> previousIssues) {
         AIProviderStrategy strategy = strategyFactory.getStrategy(request.getModel());
 
-        // 构建系统提示词
-        StringBuilder systemPrompt = new StringBuilder("""
-                你是一位资深的Java开发工程师，擅长编写高质量、规范的代码。
-                请根据需求生成完整的Java代码，包含：
-                1. 完整的类定义
-                2. 必要的字段和注解
-                3. 构造方法
-                4. Getter/Setter方法
-                5. 必要的业务方法
-                6. 代码注释
-                """);
+        // 【规范化】使用标准化的System Prompt
+        StringBuilder systemPrompt = new StringBuilder(AiPromptTemplate.GENERATE_CODE_SYSTEM);
+        
+        // 添加项目结构规范到System Prompt
+        systemPrompt.append("\n\n").append(AiPromptTemplate.CODE_GENERATION_PROJECT_STRUCTURE);
 
         // 【重试时】携带之前的反馈建议
         if (previousIssues != null && !previousIssues.isEmpty()) {
@@ -406,31 +533,284 @@ public class AiService {
             systemPrompt.append("\n请根据以上问题重新生成完整的代码，确保所有问题都已解决。");
         }
 
-        // 构建用户提示词
-        StringBuilder userPrompt = new StringBuilder("开发任务：" + request.getTaskDescription());
-        if (request.getLanguage() != null) {
-            userPrompt.append("\n编程语言：").append(request.getLanguage());
+        // 【重构】构建用户提示词，支持模块化生成
+        StringBuilder userPrompt = new StringBuilder();
+        
+        // 1. 需求书（完整传递，不允许截断）
+        if (request.getRequirementDoc() != null && !request.getRequirementDoc().isEmpty()) {
+            userPrompt.append("【需求书 - 项目整体方向】\n");
+            userPrompt.append(request.getRequirementDoc());
+            userPrompt.append("\n\n");
         }
-        if (request.getFramework() != null) {
-            userPrompt.append("\n框架/技术栈：").append(request.getFramework());
+        
+        // 2. 任务书（完整传递，不允许截断）
+        if (request.getTaskDoc() != null && !request.getTaskDoc().isEmpty()) {
+            userPrompt.append("【任务书 - 技术实现参考】\n");
+            userPrompt.append(request.getTaskDoc());
+            userPrompt.append("\n\n");
         }
-        if (request.getContextCode() != null) {
-            userPrompt.append("\n相关代码上下文：\n").append(request.getContextCode());
+        
+        // 3. 【模块化生成】当前模块信息
+        if (request.getModuleName() != null) {
+            userPrompt.append("【当前模块】\n");
+            userPrompt.append("模块名称：").append(request.getModuleName()).append("\n");
+            userPrompt.append("模块顺序：").append(request.getModuleOrder()).append("\n");
+            
+            if (request.getFileList() != null && !request.getFileList().isEmpty()) {
+                userPrompt.append("需要生成的文件：\n");
+                for (String file : request.getFileList()) {
+                    userPrompt.append("- ").append(file).append("\n");
+                }
+            }
+            userPrompt.append("\n");
+            
+            // 4. 已生成模块的摘要（用于保持一致性）
+            if (request.getGeneratedModulesSummary() != null && !request.getGeneratedModulesSummary().isEmpty()) {
+                userPrompt.append("【已生成模块摘要】（供参考，确保接口一致性）\n");
+                request.getGeneratedModulesSummary().forEach((module, summary) -> {
+                    userPrompt.append(module).append("：").append(summary).append("\n");
+                });
+                userPrompt.append("\n");
+            }
         }
+        
+        // 5. 特殊要求
         if (request.getRequirements() != null && !request.getRequirements().isEmpty()) {
-            userPrompt.append("\n特殊要求：").append(String.join(", ", request.getRequirements()));
+            userPrompt.append("【特殊要求】\n");
+            for (String req : request.getRequirements()) {
+                userPrompt.append("- ").append(req).append("\n");
+            }
+            userPrompt.append("\n");
         }
+        
+        // 6. 开发指令
+        userPrompt.append("【开发指令】\n");
+        if (request.getModuleName() != null) {
+            userPrompt.append("请生成当前模块的所有代码文件，确保与已生成模块的接口保持一致。\n");
+            userPrompt.append("如果这是第一个模块，请优先定义好实体类和接口规范。\n");
+        } else {
+            userPrompt.append("请根据以上需求书和任务书，生成完整的项目代码。\n");
+        }
+        userPrompt.append("确保所有文件完整、可运行，严格遵循技术规格。\n");
 
-        // 【修复】使用续传机制，避免代码被截断
-        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt.toString(), 8000, 5);
+        // 【步骤2】使用16k maxTokens（保守值），增加续传次数到5次
+        // 原因：32k场景下上下文容易超限，16k更稳定
+        // 预估：输入约3000token，输出约12000token，续传5次可生成6万token内容
+        String fullContent = chatWithContinuation(strategy, systemPrompt.toString(), userPrompt.toString(), 16000, 5);
 
         // 构建响应（暂不设置success，由重试服务设置）
         return GenerateCodeResponse.builder()
                 .code(fullContent)
-                .explanation("代码已生成，请查看代码注释了解详细说明")
+                .explanation(request.getModuleName() != null ? 
+                        "模块[" + request.getModuleName() + "]代码已生成" : 
+                        "代码已生成，请查看项目code目录")
                 .rawResponse(fullContent)
                 .model(request.getModel())
                 .build();
+    }
+
+    /**
+     * 【新增】解析代码内容并保存为文件
+     * 解析格式：===FILE:文件路径===\n```语言\n代码内容\n```
+     * 支持各种文件类型：.java, .vue, .js, .ts, .css, .scss, .html, .xml, .yml, .yaml, .json, .properties, .sql等
+     * 【优化】添加文件存在检查和合并逻辑，避免模块间文件覆盖
+     */
+    private void parseAndSaveCodeFiles(String projectId, String content) {
+        if (content == null || content.isEmpty()) {
+            log.warn("代码内容为空，无法解析文件");
+            return;
+        }
+
+        String projectPath = "projects/" + projectId;
+        java.nio.file.Path codeDir = java.nio.file.Paths.get(projectPath, "code");
+
+        // 正则匹配文件路径和代码内容
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "===FILE:(.+?)===\\s*```(?:[\\w+-]+)?\\s*(.+?)```",
+                java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher matcher = pattern.matcher(content);
+
+        int fileCount = 0;
+        int errorCount = 0;
+        int skipCount = 0;
+        int mergeCount = 0;
+        
+        while (matcher.find()) {
+            String filePath = matcher.group(1).trim();
+            String fileContent = matcher.group(2).trim();
+
+            // 跳过空文件路径
+            if (filePath.isEmpty()) {
+                log.warn("发现空的文件路径，跳过");
+                continue;
+            }
+
+            try {
+                // 构建完整文件路径
+                java.nio.file.Path fullFilePath = codeDir.resolve(filePath);
+                
+                // 安全检查：确保文件路径在code目录下（防止目录遍历攻击）
+                if (!fullFilePath.normalize().startsWith(codeDir.normalize())) {
+                    log.warn("非法文件路径，跳过: {}", filePath);
+                    continue;
+                }
+                
+                // 创建父目录
+                java.nio.file.Files.createDirectories(fullFilePath.getParent());
+                
+                // 【优化】检查文件是否已存在
+                if (java.nio.file.Files.exists(fullFilePath)) {
+                    String existingContent = java.nio.file.Files.readString(fullFilePath);
+                    
+                    // 如果内容相同，跳过
+                    if (existingContent.equals(fileContent)) {
+                        log.debug("文件内容相同，跳过: {}", filePath);
+                        skipCount++;
+                        continue;
+                    }
+                    
+                    // 【优化】如果是配置文件或SQL文件，尝试合并
+                    if (shouldMergeFile(filePath)) {
+                        String mergedContent = mergeFileContent(filePath, existingContent, fileContent);
+                        java.nio.file.Files.writeString(fullFilePath, mergedContent, 
+                                java.nio.charset.StandardCharsets.UTF_8);
+                        log.info("文件已合并: {} ({} 字符)", filePath, mergedContent.length());
+                        mergeCount++;
+                    } else {
+                        // 备份旧文件
+                        java.nio.file.Path backupPath = java.nio.file.Paths.get(
+                                fullFilePath.toString() + ".backup." + System.currentTimeMillis());
+                        java.nio.file.Files.copy(fullFilePath, backupPath);
+                        
+                        // 覆盖为新内容
+                        java.nio.file.Files.writeString(fullFilePath, fileContent, 
+                                java.nio.charset.StandardCharsets.UTF_8);
+                        log.warn("文件已覆盖（已备份）: {}", filePath);
+                    }
+                } else {
+                    // 新文件，直接保存
+                    java.nio.file.Files.writeString(fullFilePath, fileContent, 
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    log.info("文件已保存: {} ({} 字符)", filePath, fileContent.length());
+                }
+                
+                fileCount++;
+            } catch (Exception e) {
+                log.error("保存文件失败: {}", filePath, e);
+                errorCount++;
+            }
+        }
+
+        if (fileCount == 0 && errorCount == 0 && skipCount == 0) {
+            log.warn("未找到任何文件标记 (===FILE:...===)，请检查AI返回格式");
+        } else {
+            log.info("文件解析完成: 新建 {} 个, 跳过 {} 个, 合并 {} 个, 失败 {} 个", 
+                    fileCount, skipCount, mergeCount, errorCount);
+        }
+    }
+
+    /**
+     * 【新增】解析代码内容并保存为文件，返回保存的文件映射（用于验证）
+     * 与parseAndSaveCodeFiles逻辑相同，但返回Map供后续验证使用
+     */
+    private Map<String, String> parseAndSaveCodeFilesWithResult(String projectId, String content) {
+        Map<String, String> savedFiles = new ConcurrentHashMap<>();
+        
+        if (content == null || content.isEmpty()) {
+            log.warn("代码内容为空，无法解析文件");
+            return savedFiles;
+        }
+
+        String projectPath = "projects/" + projectId;
+        java.nio.file.Path codeDir = java.nio.file.Paths.get(projectPath, "code");
+
+        // 正则匹配文件路径和代码内容
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "===FILE:(.+?)===\\s*```(?:[\\w+-]+)?\\s*(.+?)```",
+                java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher matcher = pattern.matcher(content);
+
+        while (matcher.find()) {
+            String filePath = matcher.group(1).trim();
+            String fileContent = matcher.group(2).trim();
+
+            if (filePath.isEmpty()) {
+                continue;
+            }
+
+            try {
+                java.nio.file.Path fullFilePath = codeDir.resolve(filePath);
+                
+                // 安全检查
+                if (!fullFilePath.normalize().startsWith(codeDir.normalize())) {
+                    continue;
+                }
+                
+                // 创建父目录
+                java.nio.file.Files.createDirectories(fullFilePath.getParent());
+                
+                // 保存文件
+                java.nio.file.Files.writeString(fullFilePath, fileContent, 
+                        java.nio.charset.StandardCharsets.UTF_8);
+                
+                // 添加到结果映射
+                savedFiles.put(filePath, fileContent);
+                
+            } catch (Exception e) {
+                log.error("保存文件失败: {}", filePath, e);
+            }
+        }
+
+        return savedFiles;
+    }
+
+    /**
+     * 【新增】判断文件是否应该合并而非覆盖
+     */
+    private boolean shouldMergeFile(String filePath) {
+        String lowerPath = filePath.toLowerCase();
+        return lowerPath.endsWith(".sql") ||           // SQL文件合并
+               lowerPath.endsWith(".md") ||           // Markdown文档合并
+               lowerPath.contains("application") ||   // 配置文件合并
+               lowerPath.contains("pom.xml") ||       // Maven配置合并
+               lowerPath.contains("package.json");    // NPM配置合并
+    }
+
+    /**
+     * 【新增】合并文件内容
+     * 对于SQL文件，追加新语句；对于其他文件，智能合并
+     */
+    private String mergeFileContent(String filePath, String existing, String newContent) {
+        String lowerPath = filePath.toLowerCase();
+        
+        if (lowerPath.endsWith(".sql")) {
+            // SQL文件：追加新语句
+            return existing + "\n\n-- 新增语句\n" + newContent;
+        } else if (lowerPath.contains("application")) {
+            // 配置文件：合并YAML/Properties
+            return mergeConfigFile(existing, newContent);
+        } else {
+            // 其他文件：简单追加并标记
+            return existing + "\n\n/* ===== 新增内容 ===== */\n" + newContent;
+        }
+    }
+
+    /**
+     * 【新增】合并配置文件（简单实现）
+     */
+    private String mergeConfigFile(String existing, String newContent) {
+        // 简单合并：去重后追加
+        java.util.Set<String> existingLines = new java.util.HashSet<>(
+                java.util.Arrays.asList(existing.split("\n")));
+        StringBuilder merged = new StringBuilder(existing);
+        
+        for (String line : newContent.split("\n")) {
+            if (!existingLines.contains(line.trim()) && !line.trim().isEmpty()) {
+                merged.append("\n").append(line);
+            }
+        }
+        
+        return merged.toString();
     }
 
     /**
@@ -703,6 +1083,7 @@ public class AiService {
     /**
      * 【新增】支持续传的AI调用方法
      * 当内容被截断时，自动继续生成剩余内容
+     * 【优化】添加上下文压缩机制，防止32k场景下上下文过长
      * @param strategy AI策略
      * @param systemPrompt 系统提示词
      * @param userPrompt 用户提示词
@@ -719,8 +1100,24 @@ public class AiService {
 
         int continuationCount = 0;
         boolean isComplete = false;
+        String lastContent = ""; // 记录上次生成的内容，用于去重
 
         while (!isComplete && continuationCount <= maxContinuation) {
+            // 【优化】上下文压缩：如果消息太多，只保留系统提示、原始用户提示和最近的续传
+            if (messages.size() > 10) {
+                log.info("上下文消息过多({})，进行压缩", messages.size());
+                List<AiMessage> compressedMessages = new ArrayList<>();
+                compressedMessages.add(messages.get(0)); // 系统提示
+                compressedMessages.add(messages.get(1)); // 原始用户提示
+                // 添加最近的2轮对话（4条消息）
+                int startIdx = Math.max(2, messages.size() - 4);
+                for (int i = startIdx; i < messages.size(); i++) {
+                    compressedMessages.add(messages.get(i));
+                }
+                messages = compressedMessages;
+                log.info("上下文压缩完成，当前消息数: {}", messages.size());
+            }
+
             // 构建请求
             AiChatRequest chatRequest = AiChatRequest.builder()
                     .temperature(0.7)
@@ -738,7 +1135,14 @@ public class AiService {
             // 追加生成的内容
             String content = chatResponse.getContent();
             if (content != null && !content.isEmpty()) {
+                // 【优化】去重检查：如果新内容与上次相同，可能是模型重复生成
+                if (content.equals(lastContent)) {
+                    log.warn("检测到重复内容，停止续传");
+                    isComplete = true;
+                    break;
+                }
                 fullContent.append(content);
+                lastContent = content;
             }
 
             // 检查是否被截断
@@ -753,7 +1157,7 @@ public class AiService {
                 // 添加已生成的内容作为assistant消息
                 messages.add(AiMessage.assistant(content));
                 // 添加续传指令
-                messages.add(AiMessage.user("请继续生成剩余内容，从上次中断的地方开始，不要重复已生成的内容。"));
+                messages.add(AiMessage.user("请继续生成剩余内容，从上次中断的地方开始，不要重复已生成的内容。当前已生成" + fullContent.length() + "字符。"));
             } else {
                 // 内容完整，结束循环
                 isComplete = true;
@@ -765,5 +1169,87 @@ public class AiService {
         }
 
         return fullContent.toString();
+    }
+
+    /**
+     * 保存需求文档到数据库
+     */
+    @Transactional
+    public void saveRequirementDocToDatabase(String projectId, String content) {
+        try {
+            Long requirementId = Long.parseLong(projectId);
+            Requirement requirement = requirementRepository.findById(requirementId).orElse(null);
+            if (requirement != null) {
+                requirement.setAiRequirementDoc(content);
+                requirementRepository.save(requirement);
+                log.info("需求文档已保存到数据库, requirementId: {}, content长度: {}", 
+                        requirementId, content.length());
+            } else {
+                log.warn("未找到Requirement记录, requirementId: {}", requirementId);
+            }
+        } catch (Exception e) {
+            log.error("保存需求文档到数据库失败, projectId: {}", projectId, e);
+        }
+    }
+
+    /**
+     * 保存任务文档到数据库
+     */
+    @Transactional
+    public void saveTaskDocToDatabase(String projectId, String content) {
+        try {
+            Long requirementId = Long.parseLong(projectId);
+            Requirement requirement = requirementRepository.findById(requirementId).orElse(null);
+            if (requirement != null) {
+                requirement.setAiTaskDoc(content);
+                requirementRepository.save(requirement);
+                log.info("任务文档已保存到数据库, requirementId: {}, content长度: {}", 
+                        requirementId, content.length());
+            } else {
+                log.warn("未找到Requirement记录, requirementId: {}", requirementId);
+            }
+        } catch (Exception e) {
+            log.error("保存任务文档到数据库失败, projectId: {}", projectId, e);
+        }
+    }
+
+    /**
+     * 从数据库获取任务文档
+     */
+    public String getTaskDocFromDatabase(String projectId) {
+        try {
+            Long requirementId = Long.parseLong(projectId);
+            Requirement requirement = requirementRepository.findById(requirementId).orElse(null);
+            if (requirement != null && requirement.getAiTaskDoc() != null) {
+                log.info("从数据库获取任务文档, requirementId: {}, content长度: {}", 
+                        requirementId, requirement.getAiTaskDoc().length());
+                return requirement.getAiTaskDoc();
+            } else {
+                log.warn("数据库中未找到任务文档, requirementId: {}", requirementId);
+            }
+        } catch (Exception e) {
+            log.error("从数据库获取任务文档失败, projectId: {}", projectId, e);
+        }
+        return null;
+    }
+
+    /**
+     * 从数据库获取需求文档
+     */
+    public String getRequirementDocFromDatabase(String projectId) {
+        try {
+            Long requirementId = Long.parseLong(projectId);
+            Requirement requirement = requirementRepository.findById(requirementId).orElse(null);
+            if (requirement != null && requirement.getAiRequirementDoc() != null) {
+                log.info("从数据库获取需求文档, requirementId: {}, content长度: {}", 
+                        requirementId, requirement.getAiRequirementDoc().length());
+                return requirement.getAiRequirementDoc();
+            } else {
+                log.warn("数据库中未找到需求文档, requirementId: {}", requirementId);
+            }
+        } catch (Exception e) {
+            log.error("从数据库获取需求文档失败, projectId: {}", projectId, e);
+        }
+        return null;
     }
 }

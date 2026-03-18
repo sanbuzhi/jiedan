@@ -266,21 +266,59 @@ const orderApi = {
 const aiApi = {
   // ========== AI核心接口 ==========
   
-  // AI明确需求 - 节点1（超时11分钟，比后端10分钟稍长）
-  clarifyRequirement: (data) => post('/ai/clarify-requirement', data, { timeout: 660000 }),
+  // AI明确需求 - 节点1（超时40分钟，匹配后端配置）
+  clarifyRequirement: (data) => post('/ai/clarify-requirement', data, { timeout: 2400000 }),
 
-  // AI拆分任务 - 节点3（超时11分钟）
-  splitTasks: (data) => post('/ai/split-tasks', data, { timeout: 660000 }),
+  // AI拆分任务 - 节点3（超时40分钟，匹配后端配置）
+  splitTasks: (data) => post('/ai/split-tasks', data, { timeout: 2400000 }),
 
-  // AI生成代码 - 节点4（超时11分钟）
-  generateCode: (data) => post('/ai/generate-code', data, { timeout: 660000 }),
+  // AI生成代码 - 节点4（超时40分钟，匹配后端配置）
+  generateCode: (data) => post('/ai/generate-code', data, { timeout: 2400000 }),
 
-  // AI功能测试 - 节点5（超时11分钟）
-  functionalTest: (data) => post('/ai/functional-test', data, { timeout: 660000 }),
+  // AI功能测试 - 节点5（超时40分钟，匹配后端配置）
+  functionalTest: (data) => post('/ai/functional-test', data, { timeout: 2400000 }),
 
-  // AI安全测试 - 节点6（超时11分钟）
-  securityTest: (data) => post('/ai/security-test', data, { timeout: 660000 })
-  // 【移除】Feedback Shadow接口已删除，验证逻辑内嵌到AI接口中
+  // AI安全测试 - 节点6（超时40分钟，匹配后端配置）
+  securityTest: (data) => post('/ai/security-test', data, { timeout: 2400000 }),
+
+  // ========== 【步骤6】模块化生成接口 ==========
+  
+  // 解析任务书，获取模块列表
+  parseTaskDocument: (projectId, taskDoc) => post('/ai/parse-task', { projectId, taskDoc }, { timeout: 30000 }),
+  
+  // 生成完整项目（按模块顺序）
+  generateProject: (data) => post('/ai/generate-project', data, { timeout: 1800000 }), // 30分钟
+  
+  // 生成单个模块
+  generateModule: (data) => post('/ai/generate-module', data, { timeout: 660000 }),
+
+  // ========== 【步骤10】大项目分批次生成接口 ==========
+  
+  // 启动大项目分批次生成
+  startLargeProject: (projectId, data) => post(`/ai/large-project/start/${projectId}`, data, { timeout: 660000 }),
+  
+  // 执行下一批次生成
+  executeNextBatch: (projectId, data) => post(`/ai/large-project/next/${projectId}`, data, { timeout: 660000 }),
+  
+  // 获取批次生成状态
+  getBatchStatus: (projectId) => get(`/ai/large-project/status/${projectId}`),
+
+  // ========== 【步骤11】依赖分析和自动更新接口 ==========
+  
+  // 分析项目依赖关系
+  analyzeDependencies: (projectId, projectPath) => post(`/ai/analyze-dependencies/${projectId}`, { projectPath }, { timeout: 60000 }),
+  
+  // 分析变更影响
+  analyzeImpact: (projectId, changedModule, changedClasses) => post(`/ai/analyze-impact/${projectId}`, { changedModule, changedClasses }, { timeout: 30000 }),
+  
+  // 创建自动更新任务
+  createAutoUpdateTask: (projectId, moduleName, projectPath) => post(`/ai/auto-update/create/${projectId}`, { moduleName, projectPath }, { timeout: 30000 }),
+  
+  // 执行自动更新任务
+  executeAutoUpdateTask: (taskId) => post(`/ai/auto-update/execute/${taskId}`, {}, { timeout: 1800000 }), // 30分钟
+  
+  // 获取更新任务状态
+  getUpdateTaskStatus: (taskId) => get(`/ai/auto-update/status/${taskId}`)
 };
 
 // 数据统计API

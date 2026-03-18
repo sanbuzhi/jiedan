@@ -1,0 +1,156 @@
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  margin-right: 24rpx;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.nickname {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.task-count {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.login-btn {
+  width: 100%;
+  background-color: #07C160;
+  color: white;
+  border-radius: 8rpx;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.task-left {
+  margin-right: 24rpx;
+  padding-top: 4rpx;
+}
+
+.checkbox {
+  width: 44rpx;
+  height: 44rpx;
+  border: 2rpx solid #ddd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox.checked {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+.checkbox image {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.task-content {
+  flex: 1;
+}
+
+.task-title {
+  font-size: 30rpx;
+  color: #333;
+  margin-bottom: 12rpx;
+  font-weight: 500;
+}
+
+.task-title.completed {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  color: #666;
+}
+
+.deadline {
+  margin-left: 20rpx;
+}
+
+.task-desc {
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.6;
+}
+
+.task-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.icon-btn {
+  font-size: 22rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 6rpx;
+}
+
+.icon-btn.edit {
+  background-color: #ECF5FF;
+  color: #409EFF;
+}
+
+.icon-btn.delete {
+  background-color: #FEF0F0;
+  color: #F56C6C;
+}
+
+.empty {
+  text-align: center;
+  padding: 100rpx 0;
+}
+
+.empty image {
+  width: 300rpx;
+  height: 300rpx;
+  margin-bottom: 30rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+.add-btn {
+  position: fixed;
+  right: 40rpx;
+  bottom: 100rpx;
+  width: 120rpx;
+  height: 120rpx;
+  background-color: #409EFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(64,158,255,0.4);
+}
+
+.add-btn image {
+  width: 60rpx;
+  height: 60rpx;
+}

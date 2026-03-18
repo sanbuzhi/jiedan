@@ -23,8 +23,7 @@ public class SplitTasksRequest {
     private String projectId;
 
     /**
-     * 需求文档内容（上一步生成的Markdown文档）
+     * 需求文档内容（可选，如果为空则从数据库查询）
      */
-    @NotBlank(message = "需求文档不能为空")
     private String requirementDoc;
 }

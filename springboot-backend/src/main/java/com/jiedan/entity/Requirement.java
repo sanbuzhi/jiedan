@@ -92,6 +92,12 @@ public class Requirement {
     @Column(name = "ai_quotation_status", length = 20)
     private AiQuotationStatus aiQuotationStatus;
 
+    @Column(name = "ai_requirement_doc", columnDefinition = "TEXT")
+    private String aiRequirementDoc;
+
+    @Column(name = "ai_task_doc", columnDefinition = "TEXT")
+    private String aiTaskDoc;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

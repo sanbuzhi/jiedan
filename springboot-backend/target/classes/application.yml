@@ -3,10 +3,10 @@ server:
   address: 0.0.0.0
   servlet:
     context-path: /api
-  # 【增加超时配置】支持长连接AI调用（10分钟+缓冲）
+  # 【增加超时配置】支持长连接AI调用（30分钟+缓冲）
   tomcat:
-    connection-timeout: 720000        # 连接超时：12分钟（720秒）
-    keep-alive-timeout: 720000        # Keep-Alive超时：12分钟
+    connection-timeout: 2400000       # 连接超时：40分钟（2400秒）
+    keep-alive-timeout: 2400000       # Keep-Alive超时：40分钟
     max-connections: 1000             # 最大连接数
     accept-count: 200                 # 等待队列长度
     threads:
@@ -32,11 +32,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
+    show-sql: false
     open-in-view: false
   
   servlet:
@@ -64,8 +60,6 @@ logging:
     root: INFO
     com.jiedan: DEBUG
     org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 

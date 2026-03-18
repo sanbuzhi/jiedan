@@ -27,9 +27,6 @@ public class GenerateCodeRequest {
     private String frontendFramework;
     private String backendFramework;
 
-    // ========== 类型1：脚手架生成 ==========
-    private ScaffoldConfig scaffoldConfig;
-
     // ========== 类型2：任务开发 ==========
     private String taskId;
     private String taskName;

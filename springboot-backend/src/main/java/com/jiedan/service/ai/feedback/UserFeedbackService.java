@@ -11,6 +11,7 @@ import com.jiedan.entity.UserFeedback;
 import com.jiedan.repository.UserFeedbackRepository;
 import com.jiedan.service.ai.AIProviderStrategy;
 import com.jiedan.service.ai.AiStrategyFactory;
+import com.jiedan.service.ai.prompt.AiPromptTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -191,23 +192,19 @@ public class UserFeedbackService {
     private String buildRepairPrompt(UserFeedback feedback, List<GeneratedFile> filesToRepair) {
         StringBuilder prompt = new StringBuilder();
 
-        // 1. 角色定义
         prompt.append("【角色】\n");
         prompt.append("你是一位资深开发工程师，负责修复代码中的问题。\n\n");
 
-        // 2. 问题描述
         prompt.append("【问题描述】\n");
         prompt.append("反馈类型: ").append(feedback.getFeedbackType()).append("\n");
         prompt.append("严重程度: ").append(feedback.getSeverity()).append("\n");
         prompt.append("问题描述: ").append(feedback.getDescription()).append("\n\n");
 
-        // 3. 期望的修复方式
         if (feedback.getExpectedFix() != null && !feedback.getExpectedFix().isEmpty()) {
             prompt.append("【期望的修复方式】\n");
             prompt.append(feedback.getExpectedFix()).append("\n\n");
         }
 
-        // 4. 需要修复的文件
         prompt.append("【需要修复的文件】\n");
         for (GeneratedFile file : filesToRepair) {
             prompt.append("### ").append(file.getPath()).append("\n");
@@ -216,14 +213,12 @@ public class UserFeedbackService {
             prompt.append("```\n\n");
         }
 
-        // 5. 修复要求
         prompt.append("【修复要求】\n");
         prompt.append("1. 只修复问题描述中提到的问题，不要修改其他功能\n");
         prompt.append("2. 保持代码风格与原有代码一致\n");
         prompt.append("3. 确保修复后的代码能编译通过\n");
         prompt.append("4. 添加必要的注释说明修改内容\n\n");
 
-        // 6. 输出格式
         prompt.append("【输出格式】\n");
         prompt.append("请按以下格式输出修复后的完整文件：\n\n");
         prompt.append("```\n");
@@ -248,12 +243,23 @@ public class UserFeedbackService {
         try {
             AIProviderStrategy strategy = strategyFactory.getStrategy(null);
 
+            String systemPrompt = """
+                【角色定义】
+                你是资深开发工程师，负责修复代码中的问题。
+                
+                【修复要求】
+                1. 只修复问题描述中提到的问题，不要修改其他功能
+                2. 保持代码风格与原有代码一致
+                3. 确保修复后的代码能编译通过
+                4. 添加必要的注释说明修改内容
+                """;
+
             AiChatRequest chatRequest = AiChatRequest.builder()
                     .model(null)
                     .temperature(0.2)
                     .maxTokens(4000)
                     .build()
-                    .addSystemMessage("你是一位资深开发工程师，负责修复代码中的问题。")
+                    .addSystemMessage(systemPrompt)
                     .addUserMessage(prompt);
 
             AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
