@@ -82,7 +82,7 @@ public class FeedbackShadowService {
             DocumentParser.FeedbackShadowReport report = documentParser.parseFeedbackReport(reportContent);
 
             // 5. 保存检测报告
-            String reportPath = saveReport(request.getProjectId(), requestId, reportContent);
+            String reportPath = saveReport(request, reportContent);
 
             // 6. 构建响应
             long responseTime = System.currentTimeMillis() - startTime;
@@ -188,10 +188,22 @@ public class FeedbackShadowService {
     /**
      * 保存检测报告
      */
-    private String saveReport(String projectId, String requestId, String reportContent) {
+    private String saveReport(FeedbackShadowValidateRequest request, String reportContent) {
         try {
-            // 创建目录
-            String dirPath = String.format("projects/%s/feedback", projectId);
+            String projectId = request.getProjectId();
+            String apiType = request.getApiType();
+            Integer taskIndex = request.getTaskIndex();
+            Integer retryCount = request.getRetryCount();
+            String requestId = request.getRequestId() != null ? request.getRequestId() : UUID.randomUUID().toString();
+            
+            // 确定目录路径
+            String dirPath;
+            if (apiType != null) {
+                dirPath = String.format("projects/%s/feedback/%s", projectId, apiType);
+            } else {
+                dirPath = String.format("projects/%s/feedback", projectId);
+            }
+            
             Path dir = Paths.get(dirPath);
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
@@ -199,7 +211,15 @@ public class FeedbackShadowService {
 
             // 生成文件名
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-            String fileName = String.format("FB-%s-%s.md", timestamp, requestId.substring(0, 8));
+            String uuidPart = requestId.substring(0, 8);
+            String fileName;
+            
+            if (taskIndex != null && retryCount != null) {
+                fileName = String.format("FB-V%d-%d-%s-%s.md", taskIndex, retryCount, timestamp, uuidPart);
+            } else {
+                fileName = String.format("FB-V%d-%s-%s.md", 1, timestamp, uuidPart);
+            }
+            
             Path filePath = dir.resolve(fileName);
 
             // 写入文件

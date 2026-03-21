@@ -1,0 +1,50 @@
+# 通用配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api/beauty
+
+spring:
+  application:
+    name: beauty-shop-manage
+  profiles:
+    active: dev
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  # Redis配置
+  data:
+    redis:
+      database: 0
+      port: 6379
+      host: localhost
+      password:
+      timeout: 30000ms
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# MyBatis Plus配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.beauty.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 美妆小店自定义配置
+beauty:
+  jwt:
+    # TODO: 生产环境配置在环境变量中
+    secret-key: BEAUTY_SHOP_SECRET_KEY_32_CHARS_2024
+  aes256:
+    # TODO: 生产环境配置在环境变量中
+    secret-key: BEAUTY_SHOP_AES256_KEY_32_CHARS

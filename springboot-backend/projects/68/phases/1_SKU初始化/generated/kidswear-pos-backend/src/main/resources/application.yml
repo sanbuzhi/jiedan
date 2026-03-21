@@ -1,0 +1,37 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/kidswear
+
+spring:
+  application:
+    name: kidswear-pos-backend
+  profiles:
+    active: dev
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+
+# MyBatis Plus配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.kidswear.pos.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: ASSIGN_ID
+      table-prefix: kidswear_
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  level:
+    com.kidswear.pos: debug
+    org.springframework: info

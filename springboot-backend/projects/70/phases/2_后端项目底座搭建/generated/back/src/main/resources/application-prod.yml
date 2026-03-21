@@ -1,0 +1,57 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://your-prod-mysql-host:3306/tongquyouyi?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=GMT%2B8&useSSL=true&allowPublicKeyRetrieval=true
+    username: your-prod-mysql-username
+    password: your-prod-mysql-password
+  redis:
+    host: your-prod-redis-host
+    port: 6379
+    password: your-prod-redis-password
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 32
+        max-wait: -1ms
+        max-idle: 16
+        min-idle: 4
+
+# 自定义生产环境配置
+tongquyouyi:
+  jwt:
+    secret: tongquyouyi-jwt-secret-hs256-2024-prod-abcdefghijklmnopqrstuvwxyz1234567890
+  file:
+    upload-path: /data/tongquyouyi/upload
+  ali:
+    oss:
+      endpoint: oss-cn-hangzhou.aliyuncs.com
+      access-key-id: your-prod-oss-access-key-id
+      access-key-secret: your-prod-oss-access-key-secret
+      bucket-name: tongquyouyi-prod
+    sms:
+      access-key-id: your-prod-sms-access-key-id
+      access-key-secret: your-prod-sms-access-key-secret
+      sign-name: 童趣优衣
+      template-code: SMS_987654321
+  wechat:
+    pay:
+      app-id: your-prod-mini-program-appid
+      mch-id: your-prod-mch-id
+      api-v3-key: your-prod-api-v3-key
+      private-key-path: /data/tongquyouyi/cert/apiclient_key.pem
+      merchant-serial-number: your-prod-merchant-serial-number
+      notify-url: https://your-prod-domain.com/api/store/pay/wechat/notify
+      sandbox: false
+  alipay:
+    pay:
+      app-id: your-prod-alipay-appid
+      private-key: your-prod-alipay-private-key
+      public-key: your-prod-alipay-public-key
+      gateway-url: https://openapi.alipay.com/gateway.do
+      notify-url: https://your-prod-domain.com/api/store/pay/alipay/notify
+      return-url: https://your-prod-domain.com/store/user/order/list
+      sandbox: false
+
+knife4j:
+  production: true

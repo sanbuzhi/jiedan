@@ -3,6 +3,74 @@ import { useUserStore } from '@/stores/user'
 
 const routes = [
   {
+    path: '/client',
+    redirect: '/client/guide'
+  },
+  {
+    path: '/client/guide',
+    name: 'ClientGuide',
+    component: () => import('@/mobile/views/GuideView.vue')
+  },
+  {
+    path: '/client/login',
+    name: 'ClientLogin',
+    component: () => import('@/mobile/views/LoginView.vue')
+  },
+  {
+    path: '/client/home',
+    name: 'ClientHome',
+    component: () => import('@/mobile/views/HomeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/profile',
+    name: 'ClientProfile',
+    component: () => import('@/mobile/views/ProfileView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/points',
+    name: 'ClientPoints',
+    component: () => import('@/mobile/views/PointsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/exchange',
+    name: 'ClientExchange',
+    component: () => import('@/mobile/views/ExchangeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/requirement/step',
+    name: 'ClientRequirementStep',
+    component: () => import('@/mobile/views/RequirementStepView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/requirement/step_all',
+    name: 'ClientRequirementStepAll',
+    component: () => import('@/mobile/views/RequirementStepAllView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/requirement/ui_gallery',
+    name: 'ClientUiGallery',
+    component: () => import('@/mobile/views/UiGalleryView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/requirement/approve',
+    name: 'ClientApprove',
+    component: () => import('@/mobile/views/ApproveView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/client/requirement/suggestion',
+    name: 'ClientSuggestion',
+    component: () => import('@/mobile/views/SuggestionView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login.vue')
@@ -141,34 +209,46 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
-  
-  // 从 localStorage 获取 token（确保页面刷新后也能正确判断）
+
   const token = localStorage.getItem('token')
-  
+
   if (to.meta.requiresAuth && !token) {
-    // 未登录且访问需要登录的页面，跳转到登录页
-    next('/login')
+    if (to.path.startsWith('/client/')) {
+      next('/client/login')
+    } else {
+      next('/login')
+    }
     return
   }
-  
-  if (to.path === '/login' && token) {
-    // 已登录但访问登录页，跳转到首页
-    next('/')
+
+  if ((to.path === '/login' || to.path === '/client/login') && token) {
+    if (to.path.startsWith('/client/')) {
+      next('/client/home')
+    } else {
+      next('/')
+    }
     return
   }
-  
-  // 已登录但 store 中没有用户信息，尝试获取
+
+  if (to.path === '/client/' || to.path === '/client') {
+    next('/client/guide')
+    return
+  }
+
   if (token && !userStore.userInfo && to.meta.requiresAuth) {
     try {
       await userStore.fetchUserInfo()
     } catch (error) {
-      // 获取用户信息失败，清除 token 并跳转到登录页
       localStorage.removeItem('token')
-      next('/login')
+      if (to.path.startsWith('/client/')) {
+        next('/client/login')
+      } else {
+        next('/login')
+      }
       return
     }
   }
-  
+
   next()
 })
 

@@ -224,7 +224,7 @@ Page({
 
   // 确认支付成功
   confirmPayment: function (exchangeId) {
-    api.post(`/api/v1/points/exchange/${exchangeId}/confirm-payment`, {})
+    api.post(`/v1/points/exchange/${exchangeId}/confirm-payment`, {})
       .then(res => {
         this.handleExchangeSuccess(res);
       })

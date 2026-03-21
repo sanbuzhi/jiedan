@@ -1,0 +1,32 @@
+/* Admin 项目特有样式 */
+.admin-container {
+  min-height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.admin-content {
+  padding: 20px;
+}
+
+.admin-card {
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.admin-form-item {
+  margin-bottom: 22px;
+}
+
+.admin-page-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+}

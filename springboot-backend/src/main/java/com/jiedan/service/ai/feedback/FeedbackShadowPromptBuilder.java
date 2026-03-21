@@ -101,14 +101,6 @@ public class FeedbackShadowPromptBuilder {
                    - 输出的是引导性文字而非实际任务书内容
                 """;
 
-            case "generate-code" -> """
-                【代码生成阶段 - 放行标准】
-                - 必须有代码输出
-                - 使用 ===FILE:路径=== 格式
-                - 允许语法错误（后续修复）
-                - 只要有代码即 ALLOW
-                """;
-
             case "functional-test", "security-test" -> """
                 【测试阶段 - 放行标准】
                 - 有测试相关内容即可
@@ -124,17 +116,4 @@ public class FeedbackShadowPromptBuilder {
         };
     }
 
-    /**
-     * 截断内容，控制token
-     * 【规范化】使用AiPromptTemplate中的方法
-     */
-    private String truncateContent(String content, int maxLength) {
-        if (content == null) {
-            return "";
-        }
-        if (content.length() <= maxLength) {
-            return content;
-        }
-        return content.substring(0, maxLength) + "\n...[内容已截断]";
-    }
 }

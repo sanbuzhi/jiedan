@@ -1,7 +1,7 @@
 <template>
-  <el-config-provider :locale="zhCn">
+  <div id="app">
     <router-view :key="$route.fullPath" />
-  </el-config-provider>
+  </div>
 </template>
 
 <script setup>
@@ -19,5 +19,10 @@ html, body, #app {
   width: 100%;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#app {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 </style>

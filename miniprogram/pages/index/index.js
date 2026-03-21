@@ -25,7 +25,7 @@ const FLOW_NODES = [
 const AI_NODE_CONFIG = {
   1: { name: 'AI明确需求', api: 'clarifyRequirement', nextNode: 2, maxRetries: 0, timeout: 2400000, needsApproval: true },   // → 节点2(需求确认验收)需要人工验收
   3: { name: 'AI拆分任务', api: 'splitTasks', nextNode: 4, maxRetries: 0, timeout: 2400000, needsApproval: false },             // → 节点4(AI开发)自动继续
-  4: { name: 'AI开发', api: 'generateCode', nextNode: 5, maxRetries: 0, timeout: 2400000, needsApproval: false },              // → 节点5(AI功能测试)自动继续
+  4: { name: 'AI开发', api: 'startProjectDevelopment', nextNode: 5, maxRetries: 0, timeout: 30000, needsApproval: false, asyncPolling: true },  // → 节点5(AI功能测试)自动继续，使用新异步阶段式接口
   5: { name: 'AI功能测试', api: 'functionalTest', nextNode: 6, maxRetries: 0, timeout: 2400000, needsApproval: false },          // → 节点6(AI安全测试)自动继续
   6: { name: 'AI安全测试', api: 'securityTest', nextNode: 7, maxRetries: 0, timeout: 2400000, needsApproval: true }             // → 节点7(功能验收测试)需要人工验收
 };
@@ -251,6 +251,12 @@ Page({
 
     console.log(`执行AI节点: ${aiNode.name}, 需求ID: ${requirementId}, 重试次数: ${retryCount}`);
 
+    // 【新异步接口】节点4使用新的异步阶段式开发接口
+    if (nodeIndex === 4 && aiNode.asyncPolling) {
+      this.executeAsyncProjectDevelopment(requirementId, aiNode);
+      return;
+    }
+
     // 第一步：先将节点状态更新为"处理中"（让用户看到AI正在工作）
     // 使用一个特殊的中间状态表示AI正在处理
     const processingNodeIndex = nodeIndex; // AI执行期间保持在当前节点显示处理状态
@@ -343,6 +349,157 @@ Page({
       });
   },
 
+  // 【新增】执行异步项目开发（新接口）
+  executeAsyncProjectDevelopment: function (requirementId, aiNode) {
+    console.log(`【新接口】启动异步项目开发，需求ID: ${requirementId}`);
+    
+    // 先获取需求详情
+    const localRequirement = this.data.allRequirements.find(r => String(r.id) === String(requirementId));
+    const requirementPromise = localRequirement 
+      ? Promise.resolve(localRequirement)
+      : requirementApi.getRequirementDetail(requirementId);
+    
+    requirementPromise
+      .then(requirement => {
+        // 构建请求数据
+        const requestData = {
+          requirementId: requirement.id,
+          projectId: String(requirement.id)
+        };
+        
+        console.log('【新接口】启动项目开发请求:', requestData);
+        
+        // 调用启动接口
+        return aiApi.startProjectDevelopment(requestData);
+      })
+      .then(res => {
+        console.log('【新接口】项目开发启动成功:', res);
+        
+        const result = res.data || res;
+        if (!result.success) {
+          throw new Error(result.errorMessage || '启动项目开发失败');
+        }
+        
+        const projectId = result.data?.projectId || String(requirementId);
+        
+        // 开始轮询项目状态
+        wx.showLoading({ title: 'AI开发中...', mask: true });
+        this.pollProjectStatus(requirementId, projectId, aiNode);
+      })
+      .catch(err => {
+        console.error('【新接口】启动项目开发失败:', err);
+        this.markNodeAsFailed(requirementId, 4);
+        wx.showToast({
+          title: 'AI开发启动失败，请重试',
+          icon: 'none',
+          duration: 3000
+        });
+      });
+  },
+
+  // 【新增】轮询项目状态
+  pollProjectStatus: function (requirementId, projectId, aiNode, pollCount = 0) {
+    const maxPolls = 3600; // 最多轮询3600次（5小时，每5秒一次）
+
+    // 从本地存储恢复轮询状态（支持小程序切后台后恢复）
+    const pollState = wx.getStorageSync('poll_state_' + projectId) || {};
+    if (pollState.pollCount && pollState.pollCount > pollCount) {
+      pollCount = pollState.pollCount;
+      console.log(`【轮询恢复】从本地存储恢复轮询状态, pollCount: ${pollCount}`);
+    }
+
+    if (pollCount >= maxPolls) {
+      wx.hideLoading();
+      console.error('【新接口】轮询超时');
+      this.markNodeAsFailed(requirementId, 4);
+      wx.showToast({
+        title: 'AI开发超时，请检查状态',
+        icon: 'none',
+        duration: 3000
+      });
+      // 清除轮询状态
+      wx.removeStorageSync('poll_state_' + projectId);
+      return;
+    }
+
+    // 保存当前轮询状态到本地存储（用于后台恢复）
+    wx.setStorageSync('poll_state_' + projectId, {
+      pollCount: pollCount,
+      requirementId: requirementId,
+      lastUpdate: Date.now()
+    });
+
+    // 每5秒查询一次状态
+    setTimeout(() => {
+      aiApi.getProjectStatus(projectId)
+        .then(res => {
+          const result = res.data || res;
+          console.log(`【新接口】项目状态轮询 #${pollCount + 1}:`, result);
+
+          if (!result.success) {
+            // 网络异常，继续轮询而不是直接失败
+            console.warn('【新接口】查询状态失败，继续轮询:', result.errorMessage);
+            this.pollProjectStatus(requirementId, projectId, aiNode, pollCount + 1);
+            return;
+          }
+
+          const status = result.data;
+          const progress = status?.progress || 0;
+          const currentPhase = status?.currentPhase || 0;
+
+          // 更新加载提示
+          wx.showLoading({
+            title: `AI开发中...${progress}% (阶段${currentPhase})`,
+            mask: true
+          });
+
+          // 检查是否完成
+          if (status?.status === 'COMPLETED') {
+            wx.hideLoading();
+            console.log('【新接口】项目开发完成');
+
+            // 清除轮询状态
+            wx.removeStorageSync('poll_state_' + projectId);
+
+            // 保存结果
+            this.saveAIDocumentToRequirement(requirementId, 4, {
+              success: true,
+              projectId: projectId,
+              totalFiles: status.totalFiles,
+              phases: status.phases
+            });
+
+            // 更新节点状态到下一阶段
+            return this.updateFlowNodeStatus(requirementId, aiNode.nextNode)
+              .then(() => {
+                // 自动继续下一个AI节点
+                if (AI_NODE_CONFIG[aiNode.nextNode]) {
+                  setTimeout(() => {
+                    this.executeAINodeWithRetry(requirementId, aiNode.nextNode, 0);
+                  }, 500);
+                }
+              });
+          }
+
+          // 检查是否失败
+          if (status?.status === 'FAILED') {
+            wx.hideLoading();
+            // 清除轮询状态
+            wx.removeStorageSync('poll_state_' + projectId);
+            throw new Error(status.errorMessage || '项目开发失败');
+          }
+
+          // 继续轮询
+          this.pollProjectStatus(requirementId, projectId, aiNode, pollCount + 1);
+        })
+        .catch(err => {
+          // 网络异常，继续轮询而不是直接失败
+          console.error('【新接口】轮询异常，继续尝试:', err);
+          this.pollProjectStatus(requirementId, projectId, aiNode, pollCount + 1);
+        });
+    }, 30000); // 每30秒轮询一次
+  },
+
   // 【已移除】AI产物由后端保存，前端不需要保存
   // saveAIProduct: function (requirementId, nodeIndex, validationResult) { ... }
 
@@ -419,32 +576,14 @@ Page({
           requirementDoc: '从数据库查询'
         });
         break;
-      case 4: // AI开发
-        requestData.projectId = requirement.id ? String(requirement.id) : '';
-        // 【修改】不再传递requirementDoc和taskDoc，后端自动从数据库查询
-        console.log('【调试】AI开发请求数据:', {
+      case 4: // AI开发（新异步阶段式接口）
+        // 【新接口】使用 /ai/code/project/start 接口
+        requestData.requirementId = requirement.id;
+        requestData.projectId = String(requirement.id);
+        console.log('【新接口】AI开发请求数据:', {
           requirementId: requirement.id,
-          requirementDoc: '从数据库查询',
-          taskDoc: '从数据库查询'
-        });
-        
-        // 【步骤1】添加模块化参数支持（可选，用于大型项目）
-        if (requirement.moduleName) {
-          requestData.moduleName = requirement.moduleName;
-          requestData.fileList = requirement.fileList || [];
-          requestData.moduleOrder = requirement.moduleOrder || 1;
-          requestData.isLastModule = requirement.isLastModule || false;
-          requestData.generatedModulesSummary = requirement.generatedModulesSummary || {};
-        }
-        
-        // 可选：从任务书推断技术栈
-        console.log('【调试】AI开发请求数据:', {
-          requirementId: requirement.id,
-          hasRequirementDoc: !!requirement.requirementDoc,
-          hasTaskDoc: !!requirement.taskDoc,
-          requirementDocLength: requirement.requirementDoc ? requirement.requirementDoc.length : 0,
-          taskDocLength: requirement.taskDoc ? requirement.taskDoc.length : 0,
-          moduleName: requirement.moduleName || '未指定（完整生成）'
+          projectId: String(requirement.id),
+          note: '使用新异步阶段式开发接口'
         });
         break;
       case 5: // AI功能测试

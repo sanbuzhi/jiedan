@@ -52,4 +52,14 @@ public class FeedbackShadowValidateRequest {
      * 任务ID
      */
     private String taskId;
+    
+    /**
+     * 任务索引（1-3）
+     */
+    private Integer taskIndex;
+    
+    /**
+     * 重试次数（1-3）
+     */
+    private Integer retryCount;
 }

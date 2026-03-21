@@ -272,8 +272,22 @@ const aiApi = {
   // AI拆分任务 - 节点3（超时40分钟，匹配后端配置）
   splitTasks: (data) => post('/ai/split-tasks', data, { timeout: 2400000 }),
 
-  // AI生成代码 - 节点4（超时40分钟，匹配后端配置）
-  generateCode: (data) => post('/ai/generate-code', data, { timeout: 2400000 }),
+  // AI生成代码 - 节点4（新异步阶段式开发接口）
+  // 旧接口：generateCode: (data) => post('/ai/generate-code', data, { timeout: 2400000 }),
+  // 新接口：异步启动项目开发
+  startProjectDevelopment: (data) => post('/ai/code/project/start', data, { timeout: 30000 }),
+  
+  // 查询项目开发状态
+  getProjectStatus: (projectId) => get(`/ai/code/project/${projectId}/status`),
+  
+  // 查询阶段状态
+  getPhaseStatus: (projectId, phase) => get(`/ai/code/project/${projectId}/phase/${phase}/status`),
+  
+  // 查询阶段进度
+  getPhaseProgress: (projectId, phase) => get(`/ai/code/project/${projectId}/phase/${phase}/progress`),
+  
+  // 查询轮次详情
+  getRoundDetail: (projectId, phase, round) => get(`/ai/code/project/${projectId}/phase/${phase}/round/${round}`),
 
   // AI功能测试 - 节点5（超时40分钟，匹配后端配置）
   functionalTest: (data) => post('/ai/functional-test', data, { timeout: 2400000 }),

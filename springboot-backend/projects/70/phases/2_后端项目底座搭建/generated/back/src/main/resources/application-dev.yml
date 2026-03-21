@@ -1,0 +1,54 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/tongquyouyi?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+  redis:
+    host: localhost
+    port: 6379
+    password:
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1ms
+        max-idle: 8
+        min-idle: 0
+
+# 自定义开发环境配置
+tongquyouyi:
+  jwt:
+    secret: tongquyouyi-jwt-secret-hs256-2024-abcdefghijklmnopqrstuvwxyz
+  file:
+    upload-path: D:/tongquyouyi/upload
+  ali:
+    oss:
+      endpoint: oss-cn-hangzhou.aliyuncs.com
+      access-key-id: your-dev-oss-access-key-id
+      access-key-secret: your-dev-oss-access-key-secret
+      bucket-name: tongquyouyi-dev
+    sms:
+      access-key-id: your-dev-sms-access-key-id
+      access-key-secret: your-dev-sms-access-key-secret
+      sign-name: 童趣优衣
+      template-code: SMS_123456789
+  wechat:
+    pay:
+      app-id: your-dev-mini-program-appid
+      mch-id: your-dev-mch-id
+      api-v3-key: your-dev-api-v3-key
+      private-key-path: classpath:cert/apiclient_key.pem
+      merchant-serial-number: your-dev-merchant-serial-number
+      notify-url: http://your-dev-domain.com/api/store/pay/wechat/notify
+      sandbox: true
+  alipay:
+    pay:
+      app-id: your-dev-alipay-appid
+      private-key: your-dev-alipay-private-key
+      public-key: your-dev-alipay-public-key
+      gateway-url: https://openapi.alipaydev.com/gateway.do
+      notify-url: http://your-dev-domain.com/api/store/pay/alipay/notify
+      return-url: http://your-dev-domain.com/store/user/order/list
+      sandbox: true

@@ -1,0 +1,53 @@
+-- 数据库初始化脚本
+CREATE DATABASE IF NOT EXISTS kidswear_pos DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE kidswear_pos;
+
+-- 系统用户表
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+    password VARCHAR(255) NOT NULL COMMENT '密码',
+    nickname VARCHAR(50) COMMENT '昵称',
+    avatar VARCHAR(255) COMMENT '头像',
+    status TINYINT DEFAULT 1 COMMENT '状态 1启用 0禁用',
+    role VARCHAR(20) DEFAULT 'cashier' COMMENT '角色 admin cashier',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT DEFAULT 0 COMMENT '删除标记 1删除 0未删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户表';
+
+-- 商品分类表
+CREATE TABLE IF NOT EXISTS category (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '分类ID',
+    name VARCHAR(50) NOT NULL COMMENT '分类名称',
+    parent_id BIGINT DEFAULT 0 COMMENT '父分类ID',
+    sort_order INT DEFAULT 0 COMMENT '排序',
+    status TINYINT DEFAULT 1 COMMENT '状态 1启用 0禁用',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT DEFAULT 0 COMMENT '删除标记 1删除 0未删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品分类表';
+
+-- SKU表
+CREATE TABLE IF NOT EXISTS sku (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'SKU ID',
+    spu_id BIGINT DEFAULT 0 COMMENT 'SPU ID',
+    name VARCHAR(100) NOT NULL COMMENT 'SKU名称',
+    category_id BIGINT NOT NULL COMMENT '分类ID',
+    image VARCHAR(255) COMMENT '商品图片',
+    barcode VARCHAR(50) UNIQUE COMMENT '条形码',
+    price DECIMAL(10,2) NOT NULL COMMENT '售价',
+    cost DECIMAL(10,2) DEFAULT 0.00 COMMENT '成本价',
+    stock INT DEFAULT 0 COMMENT '库存',
+    warn_stock INT DEFAULT 10 COMMENT '预警库存',
+    spec VARCHAR(255) COMMENT '规格 JSON格式',
+    status TINYINT DEFAULT 1 COMMENT '状态 1上架 0下架',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT DEFAULT 0 COMMENT '删除标记 1删除 0未删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SKU表';
+
+-- 插入初始管理员账号 密码: admin123
+INSERT INTO sys_user (username, password, nickname, role) VALUES 
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.0yG', '系统管理员', 'admin'),
+('cashier', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.0yG', '收银员', 'cashier');

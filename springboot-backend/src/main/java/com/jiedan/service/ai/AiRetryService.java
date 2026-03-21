@@ -31,6 +31,7 @@ public class AiRetryService {
     private final FeedbackShadowService feedbackShadowService;
     private static final int MAX_RETRIES = 3;
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
+    private static final int MAX_CONTINUATION = 10;
 
     /**
      * 【核心方法】执行AI任务并自动重试（真正的多轮会话模式）
@@ -41,6 +42,7 @@ public class AiRetryService {
      * @param strategyFactory AI策略工厂
      * @param projectId 项目ID
      * @param apiType API类型
+     * @param taskIndex 任务索引（1-3）
      * @param maxTokens 最大token数
      * @param temperature 温度参数
      * @param onContentGenerated 内容生成回调（每次AI生成内容后调用，用于保存版本文件）
@@ -51,6 +53,7 @@ public class AiRetryService {
             String sessionId,
             AiStrategyFactory strategyFactory,
             String projectId, String apiType,
+            Integer taskIndex,
             int maxTokens, double temperature,
             Consumer<SplitTasksResponse> onContentGenerated) {
 
@@ -71,22 +74,10 @@ public class AiRetryService {
                     throw new IllegalStateException("会话消息为空: " + sessionId);
                 }
 
-                // 【关键】使用当前会话的所有消息构建AI请求
+                // 【关键】使用续传机制生成完整内容
                 AIProviderStrategy strategy = strategyFactory.getStrategy(null);
-                AiChatRequest chatRequest = AiChatRequest.builder()
-                        .temperature(temperature)
-                        .maxTokens(maxTokens)
-                        .messages(new ArrayList<>(currentMessages))
-                        .build();
-
-                AiChatResponse aiResponse = strategy.chatCompletion(chatRequest);
-
-                if (!Boolean.TRUE.equals(aiResponse.getSuccess())) {
-                    throw new RuntimeException("AI调用失败: " + aiResponse.getErrorMessage());
-                }
-
-                String content = aiResponse.getContent();
-                log.info("AI生成内容长度: {}, content前100字符: {}", content.length(), content.substring(0, Math.min(100, content.length())));
+                String content = chatWithContinuation(strategy, currentMessages, maxTokens, temperature);
+                log.info("AI生成完整内容长度: {}, content前100字符: {}", content.length(), content.substring(0, Math.min(100, content.length())));
 
                 // 将AI响应添加到会话历史
                 sessionManager.addAssistantMessage(sessionId, content);
@@ -105,6 +96,8 @@ public class AiRetryService {
                 FeedbackShadowValidateRequest validateRequest = FeedbackShadowValidateRequest.builder()
                         .projectId(projectId)
                         .apiType(apiType)
+                        .taskIndex(taskIndex)
+                        .retryCount(attempts)
                         .documentContent(content)
                         .build();
 
@@ -436,24 +429,68 @@ public class AiRetryService {
     }
 
     /**
-     * 设置结果内容（使用反射）
+     * 支持续传的AI调用方法
+     * 当内容被截断时，自动继续生成剩余内容
+     * @param strategy AI策略
+     * @param messages 消息列表
+     * @param maxTokens 每次调用的最大token数
+     * @param temperature 温度参数
+     * @return 完整的AI响应内容
      */
-    private <T> void setContent(T result, String content) {
-        if (result == null || content == null) {
-            return;
+    private String chatWithContinuation(AIProviderStrategy strategy, List<AiMessage> messages, 
+                                       int maxTokens, double temperature) {
+        StringBuilder fullContent = new StringBuilder();
+        List<AiMessage> currentMessages = new ArrayList<>(messages);
+        
+        int continuationCount = 0;
+        boolean isComplete = false;
+        String lastContent = "";
+        
+        while (!isComplete && continuationCount <= MAX_CONTINUATION) {
+            AiChatRequest chatRequest = AiChatRequest.builder()
+                    .temperature(temperature)
+                    .maxTokens(maxTokens)
+                    .messages(new ArrayList<>(currentMessages))
+                    .build();
+            
+            AiChatResponse chatResponse = strategy.chatCompletion(chatRequest);
+            
+            if (!Boolean.TRUE.equals(chatResponse.getSuccess())) {
+                log.error("AI续传调用失败: {}", chatResponse.getErrorMessage());
+                throw new RuntimeException("AI调用失败: " + chatResponse.getErrorMessage());
+            }
+            
+            String content = chatResponse.getContent();
+            if (content != null && !content.isEmpty()) {
+                if (content.equals(lastContent)) {
+                    log.warn("检测到重复内容，停止续传");
+                    isComplete = true;
+                    break;
+                }
+                fullContent.append(content);
+                lastContent = content;
+            }
+            
+            String finishReason = chatResponse.getFinishReason();
+            log.info("AI调用完成, finishReason: {}, 当前内容长度: {}, 续传次数: {}/{}", 
+                    finishReason, fullContent.length(), continuationCount, MAX_CONTINUATION);
+            
+            if ("length".equals(finishReason)) {
+                continuationCount++;
+                log.info("内容被截断，开始第{}次续传", continuationCount);
+                
+                currentMessages.add(AiMessage.assistant(content));
+                currentMessages.add(AiMessage.user("请继续生成剩余内容，从上次中断的地方开始，不要重复已生成的内容。当前已生成" + fullContent.length() + "字符。"));
+            } else {
+                isComplete = true;
+            }
         }
-        // 尝试设置 documentContent 字段
-        try {
-            java.lang.reflect.Method setDocumentContent = result.getClass().getMethod("setDocumentContent", String.class);
-            setDocumentContent.invoke(result, content);
-        } catch (Exception ignored) {
+        
+        if (continuationCount > MAX_CONTINUATION) {
+            log.warn("达到最大续传次数{}，内容可能不完整", MAX_CONTINUATION);
         }
-        // 尝试设置 rawResponse 字段
-        try {
-            java.lang.reflect.Method setRawResponse = result.getClass().getMethod("setRawResponse", String.class);
-            setRawResponse.invoke(result, content);
-        } catch (Exception ignored) {
-        }
+        
+        return fullContent.toString();
     }
 
     /**

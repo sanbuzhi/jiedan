@@ -92,10 +92,10 @@ public class Requirement {
     @Column(name = "ai_quotation_status", length = 20)
     private AiQuotationStatus aiQuotationStatus;
 
-    @Column(name = "ai_requirement_doc", columnDefinition = "TEXT")
+    @Column(name = "ai_requirement_doc", columnDefinition = "LONGTEXT")
     private String aiRequirementDoc;
 
-    @Column(name = "ai_task_doc", columnDefinition = "TEXT")
+    @Column(name = "ai_task_doc", columnDefinition = "LONGTEXT")
     private String aiTaskDoc;
 
     @CreationTimestamp

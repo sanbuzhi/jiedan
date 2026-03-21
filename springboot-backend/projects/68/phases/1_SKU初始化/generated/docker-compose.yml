@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # MySQL 8.0.36 数据库服务
+  kidswear-pos-db:
+    image: mysql:8.0.36
+    container_name: kidswear-pos-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Kidswear@2024}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-kidswear_pos}
+      MYSQL_USER: ${MYSQL_USER:-kidswear}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-Kidswear@2024}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - kidswear-pos-db-data:/var/lib/mysql
+      - ./kidswear-pos-backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    networks:
+      - kidswear-pos-network
+
+  # 后端服务
+  kidswear-pos-backend:
+    build:
+      context: ./kidswear-pos-backend
+      dockerfile: Dockerfile
+    container_name: kidswear-pos-backend
+    restart: always
+    depends_on:
+      - kidswear-pos-db
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      TZ: Asia/Shanghai
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - kidswear-pos-backend-logs:/app/logs
+    networks:
+      - kidswear-pos-network
+
+  # 前端服务
+  kidswear-pos-frontend:
+    build:
+      context: ./kidswear-pos-frontend
+      dockerfile: Dockerfile
+    container_name: kidswear-pos-frontend
+    restart: always
+    depends_on:
+      - kidswear-pos-backend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - kidswear-pos-network
+
+volumes:
+  kidswear-pos-db-data:
+  kidswear-pos-backend-logs:
+
+networks:
+  kidswear-pos-network:
+    driver: bridge

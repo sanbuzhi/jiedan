@@ -1,0 +1,51 @@
+/* Vant 覆盖样式 */
+:root {
+  --van-primary-color: #1989fa;
+  --van-success-color: #07c160;
+  --van-danger-color: #ee0a24;
+  --van-warning-color: #ff976a;
+  --van-background-color-light: #f7f8fa;
+  --van-text-color: #323233;
+  --van-text-color-secondary: #969799;
+}
+
+.van-nav-bar {
+  background-color: #fff;
+}
+
+.van-tabbar {
+  background-color: #fff;
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.van-tabbar-item--active {
+  color: var(--van-primary-color);
+}
+
+.van-card {
+  background-color: #fff;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.van-button--primary {
+  background: linear-gradient(90deg, #1989fa, #07c160);
+  border: none;
+}
+
+.van-field {
+  background-color: #fff;
+}
+
+.van-cell {
+  background-color: #fff;
+}
+
+.van-swipe {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.van-tag {
+  border-radius: 4px;
+}

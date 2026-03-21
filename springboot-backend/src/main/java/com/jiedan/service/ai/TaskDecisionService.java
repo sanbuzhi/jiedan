@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 任务决策者服务
@@ -52,7 +55,7 @@ public class TaskDecisionService {
      */
     private String extractField(String json, String field) {
         String pattern = "\"" + field + "\"\\s*:\\s*\"([^\"]*)\"";
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(json);
+        Matcher matcher = Pattern.compile(pattern).matcher(json);
         if (matcher.find()) {
             return matcher.group(1);
         }
@@ -63,13 +66,12 @@ public class TaskDecisionService {
      * 提取改进建议
      */
     private List<String> extractImprovements(String json) {
-        List<String> improvements = new java.util.ArrayList<>();
+        List<String> improvements = new ArrayList<>();
         String pattern = "\"improvements\"\\s*:\\s*\\[([^\\]]*)\\]";
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(json);
+        Matcher matcher = Pattern.compile(pattern).matcher(json);
         if (matcher.find()) {
             String arrayContent = matcher.group(1);
-            // 提取字符串
-            java.util.regex.Matcher itemMatcher = java.util.regex.Pattern.compile("\"([^\"]*)\"").matcher(arrayContent);
+            Matcher itemMatcher = Pattern.compile("\"([^\"]*)\"").matcher(arrayContent);
             while (itemMatcher.find()) {
                 improvements.add(itemMatcher.group(1));
             }
@@ -78,16 +80,15 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】从带验证信息的版本中选择最佳任务书
+     * 从带验证信息的版本中选择最佳任务书
      * 优先选择ALLOW状态的版本，其次REPAIR，最后REJECT
      *
-     * @param systemPrompt 系统提示词
      * @param userPrompt 用户提示词（需求文档）
      * @param versions 带验证信息的版本列表
      * @return 决策结果
      */
-    public DecisionResult selectBestVersionWithValidation(String systemPrompt, String userPrompt,
-                                                           List<VersionInfo> versions) {
+    public DecisionResult selectBestVersionWithValidation(String userPrompt,
+                                                          List<VersionInfo> versions) {
         log.info("开始任务决策(带验证信息)，候选版本数: {}", versions.size());
 
         if (versions.isEmpty()) {
@@ -140,10 +141,10 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】从指定版本列表中选择最佳
+     * 从指定版本列表中选择最佳
      */
     private DecisionResult selectBestFromVersions(String userPrompt,
-                                                   List<VersionInfo> versions, String selectionContext) {
+                                                  List<VersionInfo> versions, String selectionContext) {
         // 如果只有一个版本，直接返回
         if (versions.size() == 1) {
             VersionInfo version = versions.get(0);
@@ -154,9 +155,6 @@ public class TaskDecisionService {
                     version.getContent()
             );
         }
-
-        // 构建带验证信息的决策Prompt
-        String decisionPrompt = buildDecisionPromptWithValidation(userPrompt, versions);
 
         // 调用AI进行决策
         DecisionResult result = callAiForDecision(userPrompt, versions, selectionContext);
@@ -177,7 +175,7 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】调用AI进行决策，支持分段处理
+     * 调用AI进行决策，支持分段处理
      * 如果版本数量较多，采用锦标赛机制分批决策
      */
     private DecisionResult callAiForDecision(String userPrompt,
@@ -193,21 +191,23 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】单批次决策 - 使用上行续传方式
-     * 通过多轮对话逐个提交版本内容，避免单次token超限
+     * 单批次决策 - 整合内容后分批发送
+     * 1. 第一轮：发送系统提示词和用户提示词，引导后续文件传送
+     * 2. 整合需求文档+所有版本内容，添加"候选版本发送完毕！"
+     * 3. 分割内容，按批次发送（不超过单次token上限）
+     * 4. 最后批次获取结果并解析
      */
     private DecisionResult singleBatchDecision(String userPrompt,
                                                 List<VersionInfo> versions, String selectionContext) {
-        log.info("使用上行续传方式进行决策，版本数: {}", versions.size());
+        log.info("使用整合内容分批发送方式进行决策，版本数: {}", versions.size());
 
         AIProviderStrategy strategy = strategyFactory.getStrategy(null);
         List<AiMessage> messages = new ArrayList<>();
 
-        // 第1轮：发送系统提示词和需求文档
         String systemPrompt = buildDecisionSystemPrompt();
         messages.add(AiMessage.system(systemPrompt));
 
-        String introPrompt = buildDecisionIntroPrompt(userPrompt, versions);
+        String introPrompt = buildDecisionIntroPrompt(versions);
         messages.add(AiMessage.user(introPrompt));
 
         String aiResponse = sendMessageAndGetResponse(strategy, messages, 8000);
@@ -215,98 +215,118 @@ public class TaskDecisionService {
             return null;
         }
         messages.add(AiMessage.assistant(aiResponse));
-        log.info("第1轮：已发送系统提示和需求文档，AI响应: {}", aiResponse.substring(0, Math.min(100, aiResponse.length())));
+        log.info("【第1轮】系统提示+intro发送完成，AI响应: {}", truncateForLog(aiResponse));
 
-        // 第2-N轮：逐个发送版本内容
-        for (int i = 0; i < versions.size(); i++) {
-            VersionInfo version = versions.get(i);
-            String versionPrompt = buildVersionPrompt(version, i + 1, versions.size());
-            messages.add(AiMessage.user(versionPrompt));
+        // 整合需求文档、多版本任务书
+        String combinedContent = buildCombinedContent(userPrompt, versions);
+        List<String> batches = splitContentIntoBatches(combinedContent, 20000);
 
-            aiResponse = sendMessageAndGetResponse(strategy, messages, 8000);
+        for (int i = 0; i < batches.size(); i++) {
+            String batchPrompt = "【第" + (i + 1) + "批内容（共" + batches.size() + "批）】\n" + batches.get(i);
+            messages.add(AiMessage.user(batchPrompt));
+
+            aiResponse = sendMessageAndGetResponse(strategy, messages, 5000);
             if (aiResponse == null) {
                 return null;
             }
             messages.add(AiMessage.assistant(aiResponse));
-            log.info("第{}轮：已发送版本{}内容，AI响应: {}", i + 2, version.getVersionId(),
-                    aiResponse.substring(0, Math.min(100, aiResponse.length())));
+            log.info("【第{}批】内容发送完成，AI响应: {}", i + 2, truncateForLog(aiResponse));
         }
 
-        // 最后一轮：发送决策请求
         String decisionPrompt = buildFinalDecisionPrompt(versions);
         messages.add(AiMessage.user(decisionPrompt));
 
-        aiResponse = sendMessageAndGetResponse(strategy, messages, 16000);
+        aiResponse = sendMessageAndGetResponse(strategy, messages, 8000);
         if (aiResponse == null) {
             return null;
         }
         messages.add(AiMessage.assistant(aiResponse));
-        log.info("最终轮：已发送决策请求，AI响应: {}", aiResponse.substring(0, Math.min(200, aiResponse.length())));
+        log.info("【最终轮】决策请求发送完成，AI响应: {}", truncateForLog(aiResponse));
 
-        // 解析决策结果
         return parseDecisionResultWithValidation(aiResponse, versions, selectionContext);
+    }
+
+    /**
+     * 将需求文档和所有版本内容整合为一个字符串
+     */
+    private String buildCombinedContent(String userPrompt, List<VersionInfo> versions) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("【用户需求文档】\n").append(userPrompt).append("\n\n");
+        sb.append("【候选版本内容】\n");
+        for (VersionInfo version : versions) {
+            sb.append("=== 版本：").append(version.getVersionId()).append(" ===\n");
+            sb.append("【版本内容】\n").append(version.getContent()).append("\n\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 将内容分割为多个批次，每批不超过指定字符数
+     */
+    private List<String> splitContentIntoBatches(String content, int maxCharsPerBatch) {
+        List<String> batches = new ArrayList<>();
+        if (content.length() <= maxCharsPerBatch) {
+            batches.add(content);
+            return batches;
+        }
+
+        String[] lines = content.split("\n");
+        StringBuilder currentBatch = new StringBuilder();
+
+        for (String line : lines) {
+            if (currentBatch.length() + line.length() + 1 > maxCharsPerBatch && currentBatch.length() > 0) {
+                batches.add(currentBatch.toString());
+                currentBatch = new StringBuilder();
+            }
+            currentBatch.append(line).append("\n");
+        }
+
+        if (currentBatch.length() > 0) {
+            batches.add(currentBatch.toString());
+        }
+
+        log.info("内容分割完成，共 {} 批，总字符数: {}", batches.size(), content.length());
+        return batches;
+    }
+
+    /**
+     * 截断日志内容
+     */
+    private String truncateForLog(String content) {
+        if (content == null) return "null";
+        int len = Math.min(200, content.length());
+        return content.substring(0, len) + (content.length() > len ? "..." : "");
     }
 
     /**
      * 构建决策系统提示词
      */
     private String buildDecisionSystemPrompt() {
-        return """
-            【角色定义】
-            你是资深的技术评审专家，擅长评估技术文档的质量和适用性。
-
-            【核心任务】
-            从多个AI生成的任务书候选版本中，选择出一个最符合用户需求的最佳版本。
-
-            【决策维度】
-            1. 用户需求匹配度（最重要）
-               - 项目类型是否一致（比如美妆管理系统、宠物管理系统、图书馆管理系统）
-               - 任务书内容是否准确反映用户的原始需求
-               - 功能模块是否与需求文档一致
-               - 是否存在偏离需求的内容（如生成错误类型的项目）
-
-            2. 文档完整性
-               - 是否包含全部7个必要章节
-               - 每个章节的内容是否完整
-               - 是否存在截断或缺失
-
-            3. 内容详细程度
-               - 技术规格是否具体（含版本号）
-               - 接口定义是否完整（URL、参数、响应）
-               - 数据库设计是否详细（字段、类型、约束）
-
-            4. 技术可行性
-               - 技术栈选择是否合理
-               - 架构设计是否可行
-               - 实现难度评估
-
-            【重要规则】
-            - 我会逐个给你发送候选版本的内容，请先仔细分析每个版本
-            - 等我发送完所有版本后，再给出最终决策
-            - 输出格式必须是JSON，包含以下字段：
-              {
-                "selectedVersion": "V1-1",
-                "reason": "选择理由",
-                "improvements": ["改进建议"]
-              }
-            """;
+        return AiPromptTemplate.TASK_DECISION_SYSTEM;
     }
 
     /**
-     * 构建初始提示词（需求文档概述）
+     * 构建初始提示词
      */
-    private String buildDecisionIntroPrompt(String userPrompt, List<VersionInfo> versions) {
+    private String buildDecisionIntroPrompt(List<VersionInfo> versions) {
         String versionList = versions.stream()
                 .map(VersionInfo::getVersionId)
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("");
-        
-        return "【用户需求文档】\n" + userPrompt + "\n\n" +
+
+        return "【任务说明】\n" +
+                "我需要从多个候选版本中选择最佳任务书。\n\n" +
                 "【候选版本信息】\n" +
-                "共有 " + versions.size() + " 个候选版本需要分析：\n" +
+                "共有 " + versions.size() + " 个候选版本：\n" +
                 "版本列表：" + versionList + "\n\n" +
-                "【任务】\n" +
-                "我将逐个发送每个版本的完整内容，请仔细分析。等全部发送完后，请告诉我最终选择哪个版本及理由。\n";
+                "【发送内容】\n" +
+                "后续我将分批发送：\n" +
+                "1. 需求文档（用户原始需求）\n" +
+                "2. 所有候选版本的完整内容\n\n" +
+                "【重要规则】\n" +
+                "1. 内容是分批发送的，请耐心等待全部批次接收完成\n" +
+                "2. 收到\"候选版本发送完毕！\"指令后，才能进行决策\n" +
+                "3. 如果发现内容不完整或被截断，请在reason中说明\n";
     }
 
     /**
@@ -315,46 +335,41 @@ public class TaskDecisionService {
     private String buildVersionPrompt(VersionInfo version, int currentNum, int totalNum) {
         return "=== 候选版本 " + currentNum + "/" + totalNum + " ===\n" +
                 "版本ID: " + version.getVersionId() + "\n" +
-                "验证状态: " + version.getValidationDecision() + "\n\n" +
                 "【版本内容开始】\n" +
                 version.getContent() + "\n" +
-                "【版本内容结束】\n\n" +
-                "请分析这个版本的特点和优缺点。\n";
+                "【版本内容结束】\n\n";
     }
 
     /**
      * 构建最终决策提示词
      */
     private String buildFinalDecisionPrompt(List<VersionInfo> versions) {
-        return "【任务完成】\n" +
-                "以上是全部 " + versions.size() + " 个候选版本的内容分析。\n\n" +
+        return "\n\n以上是全部 " + versions.size() + " 个候选版本的任务书内容。" +
+                "请按系统提示词的要求从以上版本中选择最佳版本\n\n"+
                 "【输出要求】\n" +
-                "请从以上版本中选择最佳版本，输出JSON格式：\n" +
+                "输出完整可解析的JSON格式：\n" +
                 "{\n" +
                 "  \"selectedVersion\": \"选中的版本号\",\n" +
                 "  \"reason\": \"详细的选择理由，包括与其他版本的对比\",\n" +
                 "  \"improvements\": [\"改进建议1\", \"改进建议2\"]\n" +
                 "}\n\n" +
-                "注意：\n" +
-                "- 项目类型必须与需求文档一致（禁止选择宠物社区、校园二手书等与需求无关的版本）\n" +
-                "- 必须包含全部7个必要章节\n" +
-                "- 优先选择验证状态为ALLOW的版本\n";
+                "候选版本发送完毕！";
     }
 
     /**
      * 发送消息并获取响应
      */
     private String sendMessageAndGetResponse(AIProviderStrategy strategy, List<AiMessage> messages, int maxTokens) {
-        // 上下文压缩：如果消息太多，只保留关键信息
-        if (messages.size() > 20) {
+        // 上下文压缩：15万字/20000 ≈ 8批，总消息约14-16条，阈值设为12
+        if (messages.size() > 12) {
             log.info("上下文消息过多({})，进行压缩", messages.size());
             List<AiMessage> compressedMessages = new ArrayList<>();
             // 保留系统提示
             compressedMessages.add(messages.get(0));
-            // 保留用户需求概述（第2条）
+            // 保留intro（第2条）
             compressedMessages.add(messages.get(1));
-            // 保留最近6轮对话（12条消息）
-            int startIdx = Math.max(2, messages.size() - 12);
+            // 保留最近对话（压缩到8条，即4轮）
+            int startIdx = Math.max(2, messages.size() - 8);
             for (int i = startIdx; i < messages.size(); i++) {
                 compressedMessages.add(messages.get(i));
             }
@@ -380,14 +395,14 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】锦标赛决策机制 - 支持第一轮并行执行
+     * 锦标赛决策机制 - 支持第一轮并行执行
      * 将版本分批比较，最终选出最佳版本
      */
     private DecisionResult tournamentDecision(String userPrompt,
                                                List<VersionInfo> versions, String selectionContext) {
         log.info("开始锦标赛决策，总版本数: {}", versions.size());
 
-        List<VersionInfo> currentRound = new java.util.ArrayList<>(versions);
+        List<VersionInfo> currentRound = new ArrayList<>(versions);
         int round = 1;
 
         while (currentRound.size() > 3) {
@@ -429,7 +444,7 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】并行批量决策 - 第一轮使用
+     * 并行批量决策 - 第一轮使用
      * 将版本分成多组，每组并行执行决策
      */
     private List<VersionInfo> parallelBatchDecision(String userPrompt,
@@ -437,7 +452,7 @@ public class TaskDecisionService {
                                                     int round,
                                                     String selectionContext) {
         // 将版本分成每3个一组
-        List<List<VersionInfo>> batches = new java.util.ArrayList<>();
+        List<List<VersionInfo>> batches = new ArrayList<>();
         for (int i = 0; i < currentRound.size(); i += 3) {
             int end = Math.min(i + 3, currentRound.size());
             batches.add(currentRound.subList(i, end));
@@ -474,13 +489,13 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】串行批量决策 - 后续轮次使用
+     * 串行批量决策 - 后续轮次使用
      */
     private List<VersionInfo> serialBatchDecision(String userPrompt,
-                                                 List<VersionInfo> currentRound,
-                                                 int round,
-                                                 String selectionContext) {
-        List<VersionInfo> winners = new java.util.ArrayList<>();
+                                                  List<VersionInfo> currentRound,
+                                                  int round,
+                                                  String selectionContext) {
+        List<VersionInfo> winners = new ArrayList<>();
 
         for (int i = 0; i < currentRound.size(); i += 3) {
             int end = Math.min(i + 3, currentRound.size());
@@ -511,7 +526,7 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】构建带验证信息的决策Prompt
+     * 构建带验证信息的决策Prompt
      */
     private String buildDecisionPromptWithValidation(String userPrompt,
                                                       List<VersionInfo> versions) {
@@ -553,7 +568,7 @@ public class TaskDecisionService {
         - 无冗余描述，每句话都指向代码实现
         - 文档结构完整，可被TaskDocumentParser解析
         - 项目类型与需求文档完全一致
-        """; //任务严格要求
+        """;
         prompt.append(taskMdMustNeed).append("\n\n");
 
         prompt.append("【用户需求文档】\n");
@@ -566,7 +581,6 @@ public class TaskDecisionService {
             prompt.append("=== ").append(version.getVersionId()).append(" ===\n");
             prompt.append("验证状态: ").append(version.getValidationDecision()).append("\n");
             prompt.append("---\n");
-            // 使用完整内容，不截断
             prompt.append(version.getContent()).append("\n\n");
         }
 
@@ -604,7 +618,7 @@ public class TaskDecisionService {
     }
 
     /**
-     * 【新增】解析带验证信息的决策结果
+     * 解析带验证信息的决策结果
      */
     private DecisionResult parseDecisionResultWithValidation(String content, List<VersionInfo> versions,
                                                                String selectionContext) {

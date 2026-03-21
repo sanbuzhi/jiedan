@@ -109,13 +109,13 @@ const clearReferrerCode = () => {
 };
 
 // 获取API基础URL（统一配置，确保全局一致）
-// 返回格式: http://localhost:8080/api/v1
+// 返回格式: http://localhost:8080/v1
 const getApiBaseUrl = () => {
   const app = getApp();
   // 优先从全局配置获取，否则使用默认开发环境地址
   const baseUrl = app && app.globalData.apiBaseUrl ? app.globalData.apiBaseUrl : 'http://192.168.1.3:8080';
-  // 确保返回的URL包含 /api/v1 路径
-  return baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
+  // 确保返回的URL包含 /v1 路径
+  return baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
 };
 
 // 获取完整的头像URL（包含服务器地址）

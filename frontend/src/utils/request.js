@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/v1',
   timeout: 10000
 })
 

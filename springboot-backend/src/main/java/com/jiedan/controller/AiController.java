@@ -76,32 +76,6 @@ public class AiController {
     }
 
     /**
-     * AI生成代码
-     * POST /v1/ai/generate-code
-     */
-    @PostMapping("/generate-code")
-    public ResponseEntity<ApiResponse<GenerateCodeResponse>> generateCode(
-            @CurrentUser Long userId,
-            @Valid @RequestBody GenerateCodeRequest request) {
-        log.info("收到AI生成代码请求, userId: {}", userId);
-
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("用户未认证"));
-        }
-
-        try {
-            GenerateCodeResponse response = aiService.generateCode(request);
-            log.info("AI生成代码成功, userId: {}", userId);
-            return ResponseEntity.ok(ApiResponse.success(response));
-        } catch (Exception e) {
-            log.error("AI生成代码失败, userId: {}, error: {}", userId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("AI生成代码失败: " + e.getMessage()));
-        }
-    }
-
-    /**
      * AI功能测试
      * POST /v1/ai/functional-test
      */

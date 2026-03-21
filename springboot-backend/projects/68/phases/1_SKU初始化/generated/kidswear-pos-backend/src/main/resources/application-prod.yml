@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://kidswear-pos-db:3306/kidswear_pos?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:-kidswear}
+    password: ${MYSQL_PASSWORD:-Kidswear@2024}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: KidswearPosHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+# JWT配置
+kidswear:
+  jwt:
+    secret: U2FsdGVkX19yYW5kb21rZXlmb3JraWRzd2VhcmRvc3BvczIwMjQwNjAx
+    expiration: 1800000
+    prefix: Bearer
+    header: Authorization
+
+# 日志配置（生产环境输出到文件）
+logging:
+  file:
+    name: /app/logs/kidswear-pos-backend.log
+  level:
+    com.kidswear.pos: info
+    org.springframework: warn
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

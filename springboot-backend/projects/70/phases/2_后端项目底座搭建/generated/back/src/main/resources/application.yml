@@ -1,0 +1,62 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: tongquyouyi
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.tongquyouyi.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+    enable-swagger-models: true
+    enable-document-manage: true
+  production: false
+
+# 自定义配置前缀
+tongquyouyi:
+  jwt:
+    # 会被dev/prod覆盖
+    secret: default-secret-change-me-in-dev-prod
+    token-expire-days: 7
+    refresh-token-expire-days: 14
+    header: Authorization
+    prefix: "Bearer "
+  file:
+    # 会被dev/prod覆盖
+    upload-path: default-path
+    max-image-size: 5242880
+    max-excel-size: 104857600
+  redis:
+    prefix: tqy:
+    captcha-expire-seconds: 300
+    sms-expire-seconds: 300
+    token-expire-seconds: 604800
+    refresh-token-expire-seconds: 1209600
+    ip-brush-expire-seconds: 60
+    ip-brush-max-count: 10

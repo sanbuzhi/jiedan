@@ -1,0 +1,38 @@
+{
+  "name": "mall-store",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "vue": "^3.3.11",
+    "vue-router": "^4.2.5",
+    "pinia": "^2.1.7",
+    "pinia-plugin-persistedstate": "^3.2.0",
+    "axios": "^1.6.2",
+    "vant": "^4.8.0",
+    "@vant/touch-emulator": "^1.4.0",
+    "dayjs": "^1.11.10",
+    "lodash-es": "^4.17.21",
+    "swiper": "^11.0.5",
+    "vue-awesome-swiper": "^5.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.2",
+    "vite": "^5.0.8",
+    "unplugin-auto-import": "^0.17.3",
+    "unplugin-vue-components": "^0.26.0",
+    {
+      "resolvers": ["VantResolver"]
+    },
+    "eslint": "^8.55.0",
+    "eslint-plugin-vue": "^9.19.2",
+    "sass": "^1.69.5",
+    "postcss-px-to-viewport": "^1.1.1"
+  }
+}

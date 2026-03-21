@@ -14,9 +14,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 
 /**
  * AI并行任务执行器
@@ -218,7 +216,7 @@ public class AiParallelExecutor {
                     .toList());
 
             DecisionResult decision = taskDecisionService.selectBestVersionWithValidation(
-                    systemPrompt, userPrompt, versionCollector.getAllVersions(projectId));
+                    userPrompt, versionCollector.getAllVersions(projectId));
 
             log.info("任务决策完成，选中版本: {}, 理由: {}, selectedContent长度: {}",
                     decision.selectedVersion(), decision.reason(), 
@@ -281,6 +279,7 @@ public class AiParallelExecutor {
                         strategyFactory,
                         projectId,
                         "split-tasks",
+                        taskIndex,
                         16000,  // maxTokens
                         0.7,    // temperature
                         (splitResponse) -> {
@@ -330,16 +329,6 @@ public class AiParallelExecutor {
         } catch (Exception e) {
             log.error("并行任务 #{} 执行异常", taskIndex, e);
         }
-    }
-
-    /**
-     * 从响应中提取版本ID
-     */
-    private String extractVersionId(SplitTasksResponse response) {
-        // 尝试从 sessionManager 获取最新的版本ID
-        // 由于版本ID是在回调中生成的，这里需要一种方式传递
-        // 暂时使用时间戳作为版本ID的一部分
-        return "V" + System.currentTimeMillis();
     }
 
     /**
@@ -455,13 +444,7 @@ public class AiParallelExecutor {
      */
     private String getValidationDecisionFromFeedback(String projectId, String versionId) {
         try {
-            Path feedbackDir = Paths.get("projects", projectId, "feedback");
-            if (!Files.exists(feedbackDir)) {
-                return "UNKNOWN";
-            }
-
-            // 查找对应的Feedback报告文件
-            // 文件名格式：V{任务序号}-{重试次数}-{时间戳}-{uuid}.md
+            // 解析versionId: V{taskIndex}-{retryCount}
             String[] parts = versionId.replace("V", "").split("-");
             if (parts.length < 2) {
                 return "UNKNOWN";
@@ -469,23 +452,38 @@ public class AiParallelExecutor {
             int taskNum = Integer.parseInt(parts[0]);
             int retryNum = Integer.parseInt(parts[1]);
 
-            // 遍历Feedback文件，找到时间戳最接近的那个
-            DirectoryStream<Path> stream = Files.newDirectoryStream(feedbackDir, "FB-*.md");
+            // Feedback报告现在保存在 projects/{projectId}/feedback/split-tasks/ 目录下
+            Path feedbackDir = Paths.get("projects", projectId, "feedback", "split-tasks");
+            if (!Files.exists(feedbackDir)) {
+                log.warn("Feedback目录不存在: {}", feedbackDir);
+                return "UNKNOWN";
+            }
+
+            // 查找对应的Feedback报告文件
+            // 文件名格式：FB-V{taskIndex}-{retryCount}-{timestamp}-{uuid}.md
+            DirectoryStream<Path> stream = Files.newDirectoryStream(feedbackDir, "FB-V*.md");
             Path bestMatch = null;
             long bestTime = Long.MAX_VALUE;
 
             for (Path fbFile : stream) {
                 String fbName = fbFile.getFileName().toString();
-                // FB-20260318-123456-abc.md -> 提取时间戳
-                if (fbName.startsWith("FB-")) {
+                if (fbName.startsWith("FB-V")) {
                     String[] fbParts = fbName.split("-");
-                    if (fbParts.length >= 3) {
+                    if (fbParts.length >= 4) {
                         try {
-                            String timeStr = fbParts[1] + fbParts[2].replace(".md", "");
-                            long fbTime = Long.parseLong(timeStr);
-                            if (fbTime < bestTime) {
-                                bestTime = fbTime;
-                                bestMatch = fbFile;
+                            // FB-V{taskIndex}-{retryCount}-{timestamp}-{uuid}.md
+                            // fbParts[1] = "V{taskIndex}", fbParts[2] = "{retryCount}"
+                            int fbTaskNum = Integer.parseInt(fbParts[1].replace("V", ""));
+                            int fbRetryNum = Integer.parseInt(fbParts[2]);
+                            
+                            // 匹配taskIndex和retryCount
+                            if (fbTaskNum == taskNum && fbRetryNum == retryNum) {
+                                String timeStr = fbParts[3];
+                                long fbTime = Long.parseLong(timeStr);
+                                if (fbTime < bestTime) {
+                                    bestTime = fbTime;
+                                    bestMatch = fbFile;
+                                }
                             }
                         } catch (NumberFormatException ignored) {}
                     }

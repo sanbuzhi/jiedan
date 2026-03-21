@@ -1,8 +1,8 @@
 server:
   port: 8080
   address: 0.0.0.0
-  servlet:
-    context-path: /api
+  #servlet:
+    #context-path: /api
   # 【增加超时配置】支持长连接AI调用（30分钟+缓冲）
   tomcat:
     connection-timeout: 2400000       # 连接超时：40分钟（2400秒）
